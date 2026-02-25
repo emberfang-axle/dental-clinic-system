@@ -1,6 +1,7 @@
 🦷 Dental Clinic Appointment and Billing System
 
 A modern, full-stack dental clinic management system with appointment scheduling, patient records, billing, and payment integration.
+<<<<<<< HEAD
 
 About the Project
 
@@ -16,3 +17,8 @@ Features
 
 🛠️ System Features Role-based access control (RBAC) Real-time data updates Google Calendar integration Modern responsive UI Secure authentication Data persistence with Firebase
 
+About the Project
+
+This Dental Clinic Appointment and Billing System is a comprehensive web application designed to streamline dental clinic operations. 
+It provides separate interfaces for doctors, staff, and patients to manage appointments, patient records, billing, and payments efficiently.
+>>>>>>> 470486d2568077e9885e1c87717e45dbd6caa385
