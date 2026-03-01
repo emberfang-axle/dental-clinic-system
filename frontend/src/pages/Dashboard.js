@@ -1,61 +1,37 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { useAuth } from '../context/AuthContext';
 
 function Dashboard() {
-  const { user, userData } = useAuth();
-  const [stats, setStats] = useState({
-    totalPatients: 0,
-    todayAppointments: 0,
-    pendingBills: 0,
-    totalRevenue: 0
-  });
-  const [recentAppointments, setRecentAppointments] = useState([]);
+  const { userData } = useAuth();
+  const [myAppointments, setMyAppointments] = useState([]);
 
   useEffect(() => {
-    fetchDashboardData();
+    if (userData?.role === 'patient') {
+      fetchMyAppointments();
+    }
   }, [userData]);
 
-  const fetchDashboardData = async () => {
+  const fetchMyAppointments = async () => {
     try {
-      const today = new Date().toISOString().split('T')[0];
-
-      const appointmentsQuery = query(
+      const q = query(
         collection(db, 'appointments'),
-        orderBy('createdAt', 'desc')
+        where('patientId', '==', userData.uid)
       );
-      const appointmentsSnapshot = await getDocs(appointmentsQuery);
-      const allAppointments = appointmentsSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-
-      const todayAppointments = allAppointments.filter(apt => apt.date === today);
-      
-      const patientsQuery = query(collection(db, 'patients'));
-      const patientsSnapshot = await getDocs(patientsQuery);
-      
-      const billsQuery = query(collection(db, 'billing'));
-      const billsSnapshot = await getDocs(billsQuery);
-      const bills = billsSnapshot.docs.map(doc => doc.data());
-      
-      const pendingBills = bills.filter(bill => bill.paymentStatus === 'pending');
-      const totalRevenue = bills
-        .filter(bill => bill.paymentStatus === 'paid')
-        .reduce((sum, bill) => sum + (bill.total || 0), 0);
-
-      setStats({
-        totalPatients: patientsSnapshot.size,
-        todayAppointments: todayAppointments.length,
-        pendingBills: pendingBills.length,
-        totalRevenue: totalRevenue
-      });
-
-      setRecentAppointments(todayAppointments.slice(0, 5));
+      const snapshot = await getDocs(q);
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setMyAppointments(data.slice(0, 3)); // Latest 3
     } catch (error) {
-      console.error('Error fetching dashboard data:', error);
+      console.error('Error fetching appointments:', error);
     }
+  };
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-PH', {
+      style: 'currency',
+      currency: 'PHP'
+    }).format(amount);
   };
 
   const getStatusBadge = (status) => {
@@ -68,94 +44,124 @@ function Dashboard() {
     return badges[status] || 'badge-info';
   };
 
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-PH', {
-      style: 'currency',
-      currency: 'PHP'
-    }).format(amount);
-  };
+  // PATIENT DASHBOARD
+  if (userData?.role === 'patient') {
+    return (
+      <div className="dashboard-page">
+        <div className="page-header">
+          <div>
+            <h1 className="page-title">Welcome, {userData?.fullName}!</h1>
+            <p className="page-subtitle">Book your dental appointment today</p>
+          </div>
+          <button 
+            className="btn btn-primary btn-lg"
+            onClick={() => window.location.href = '/appointments'}
+            style={{ fontSize: '1.1rem', padding: '15px 30px' }}
+          >
+            📅 Book Appointment Now
+          </button>
+        </div>
 
-  return (
-    <div className="dashboard">
-      <div className="page-header">
-        <h1 className="page-title">Welcome back, {userData?.fullName || 'User'}!</h1>
-        <p className="page-subtitle">Here's what's happening today</p>
-      </div>
-
-      <div className="stats-grid">
-        <div className="stat-card">
-          <div className="stat-icon blue">👥</div>
-          <div className="stat-content">
-            <h3>{stats.totalPatients}</h3>
-            <p>Total Patients</p>
+        {/* Quick Stats */}
+        <div className="stats-grid">
+          <div className="stat-card">
+            <div className="stat-icon">📅</div>
+            <div className="stat-content">
+              <h3>{myAppointments.length}</h3>
+              <p>My Appointments</p>
+            </div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-icon">✅</div>
+            <div className="stat-content">
+              <h3>{myAppointments.filter(a => a.status === 'completed').length}</h3>
+              <p>Completed</p>
+            </div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-icon">⏳</div>
+            <div className="stat-content">
+              <h3>{myAppointments.filter(a => a.status === 'pending').length}</h3>
+              <p>Pending</p>
+            </div>
           </div>
         </div>
 
-        <div className="stat-card">
-          <div className="stat-icon green">📅</div>
-          <div className="stat-content">
-            <h3>{stats.todayAppointments}</h3>
-            <p>Today's Appointments</p>
+        {/* Recent Appointments */}
+        <div className="card">
+          <div className="card-header">
+            <h3 className="card-title">📋 My Recent Appointments</h3>
           </div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-icon orange">💳</div>
-          <div className="stat-content">
-            <h3>{stats.pendingBills}</h3>
-            <p>Pending Bills</p>
-          </div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-icon purple">💰</div>
-          <div className="stat-content">
-            <h3>{formatCurrency(stats.totalRevenue)}</h3>
-            <p>Total Revenue</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="card">
-        <div className="card-header">
-          <h2 className="card-title">Today's Appointments</h2>
-        </div>
-        
-        {recentAppointments.length > 0 ? (
-          <div className="table-container">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Time</th>
-                  <th>Patient</th>
-                  <th>Service</th>
-                  <th>Doctor</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recentAppointments.map((apt) => (
-                  <tr key={apt.id}>
-                    <td>{apt.time}</td>
-                    <td>{apt.patientName}</td>
-                    <td>{apt.service}</td>
-                    <td>{apt.doctorName}</td>
-                    <td>
-                      <span className={`badge ${getStatusBadge(apt.status)}`}>
-                        {apt.status}
-                      </span>
-                    </td>
+          {myAppointments.length > 0 ? (
+            <div className="table-container">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Time</th>
+                    <th>Service</th>
+                    <th>Price</th>
+                    <th>Status</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {myAppointments.map((apt) => (
+                    <tr key={apt.id}>
+                      <td>{apt.date}</td>
+                      <td>{apt.time}</td>
+                      <td>{apt.service}</td>
+                      <td style={{ fontWeight: '600', color: 'var(--primary)' }}>
+                        {formatCurrency(apt.price)}
+                      </td>
+                      <td>
+                        <span className={`badge ${getStatusBadge(apt.status)}`}>
+                          {apt.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div style={{ textAlign: 'center', padding: '40px' }}>
+              <p style={{ color: 'var(--gray)', marginBottom: '20px' }}>
+                No appointments yet
+              </p>
+              <button 
+                className="btn btn-primary"
+                onClick={() => window.location.href = '/appointments'}
+              >
+                Book Your First Appointment
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Info Card */}
+        <div className="card" style={{ background: 'var(--info-light)', border: '1px solid var(--info)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+            <div style={{ fontSize: '3rem' }}>👨‍⚕️</div>
+            <div>
+              <h3 style={{ marginBottom: '5px' }}>Dr. Estandarte</h3>
+              <p style={{ color: 'var(--gray)', margin: 0 }}>
+                General Dentist | Monday - Friday: 9AM - 5PM | Contact: 0912 345 6789
+              </p>
+            </div>
           </div>
-        ) : (
-          <p style={{ textAlign: 'center', color: '#64748b', padding: '20px' }}>
-            No appointments for today
-          </p>
-        )}
+        </div>
       </div>
+    );
+  }
+
+  // STAFF/DOCTOR DASHBOARD (keep existing)
+  return (
+    <div className="dashboard-page">
+      <div className="page-header">
+        <h1 className="page-title">Dashboard</h1>
+        <p className="page-subtitle">Welcome back, {userData?.fullName}!</p>
+      </div>
+      {/* Staff dashboard content... */}
     </div>
   );
 }

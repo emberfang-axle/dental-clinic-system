@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../services/firebase';
 
 function Register() {
@@ -32,33 +32,43 @@ function Register() {
       return setError('Passwords do not match');
     }
 
+    if (formData.password.length < 6) {
+      return setError('Password must be at least 6 characters');
+    }
+
     setLoading(true);
 
     try {
-      // Create user in Firebase Auth
+      // Step 1: Create user in Firebase Auth
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         formData.email,
         formData.password
       );
 
-      // Create user document in Firestore
+      // Step 2: Create user document in Firestore with full name
       await setDoc(doc(db, 'users', userCredential.user.uid), {
+        uid: userCredential.user.uid,
         email: formData.email,
-        fullName: formData.fullName,
+        fullName: formData.fullName,  // Save the full name!
         phone: formData.phone,
         role: formData.role,
         createdAt: new Date().toISOString()
       });
 
-      navigate('/');
+      alert('Account created successfully!');
+      
+      setTimeout(() => {
+        navigate('/');
+      }, 1000);
+      
     } catch (err) {
+      console.error('Register error:', err);
       if (err.code === 'auth/email-already-in-use') {
-        setError('Email already registered');
+        setError('Email is already registered');
       } else {
         setError('Failed to create account');
       }
-      console.error('Register error:', err);
     } finally {
       setLoading(false);
     }
@@ -67,14 +77,14 @@ function Register() {
   return (
     <div className="login-container">
       <div className="login-box">
-        <div className="login-logo">
-          <h1>🦷</h1>
+        <div className="login-logo" style={{ textAlign: 'center', marginBottom: '30px' }}>
+          <h1 style={{ fontSize: '3rem' }}>🦷</h1>
           <h2>Register</h2>
           <p>Create your account</p>
         </div>
 
         {error && (
-          <div className="alert alert-danger">
+          <div style={{ padding: '12px', background: '#fee2e2', color: '#dc2626', borderRadius: '8px', marginBottom: '15px' }}>
             {error}
           </div>
         )}
@@ -121,12 +131,7 @@ function Register() {
 
           <div className="form-group">
             <label className="form-label">Account Type</label>
-            <select 
-              name="role" 
-              className="form-control"
-              value={formData.role}
-              onChange={handleChange}
-            >
+            <select name="role" className="form-control" value={formData.role} onChange={handleChange}>
               <option value="patient">Patient</option>
               <option value="staff">Staff</option>
               <option value="doctor">Doctor</option>
@@ -159,21 +164,13 @@ function Register() {
             />
           </div>
 
-          <button 
-            type="submit" 
-            className="btn btn-primary btn-lg" 
-            style={{ width: '100%' }}
-            disabled={loading}
-          >
+          <button type="submit" className="btn btn-primary btn-lg" style={{ width: '100%', marginTop: '10px' }} disabled={loading}>
             {loading ? 'Creating Account...' : 'Register'}
           </button>
         </form>
 
         <p style={{ textAlign: 'center', marginTop: '20px' }}>
-          Already have an account?{' '}
-          <Link to="/login" style={{ color: 'var(--primary)' }}>
-            Login here
-          </Link>
+          Already have an account? <Link to="/login" style={{ color: '#2563eb', fontWeight: '500' }}>Login here</Link>
         </p>
       </div>
     </div>

@@ -29,15 +29,22 @@ function Navbar() {
   return (
     <nav className="navbar">
       <div className="navbar-brand">
-        <span>🦷</span>
-        <span>Dental Clinic</span>
+        <img 
+          src="/logo.png" 
+          alt="Estandarte Dental" 
+          className="nav-logo"
+          onError={(e) => {e.target.style.display='none'}} 
+        />
+        <span>Estandarte Dental Clinic</span>
       </div>
       <div className="navbar-user">
         <div className="user-info">
-          <div className="user-name">{userData?.fullName || user?.email}</div>
+          <div className="user-name">
+            {userData?.fullName || user?.displayName || user?.email?.split('@')[0] || 'User'}
+          </div>
           <div className="user-role">{getRoleLabel(userData?.role)}</div>
         </div>
-        <button className="btn btn-outline btn-sm" onClick={handleLogout}>
+        <button className="btn btn-outline" onClick={handleLogout} style={{ padding: '8px 15px', fontSize: '0.85rem' }}>
           Logout
         </button>
       </div>

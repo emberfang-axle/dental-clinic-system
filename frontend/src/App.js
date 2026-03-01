@@ -1,7 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import ProtectedRoute from './components/ProtectedRoute';
+import Loading from './components/Loading';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
@@ -16,7 +16,15 @@ import Sidebar from './components/Sidebar';
 import './App.css';
 
 function AppContent() {
-  const { user, userData } = useAuth();
+  const { user, userData, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <Loading type="spinner" text="Loading..." />
+      </div>
+    );
+  }
 
   if (!user) {
     return (
@@ -29,47 +37,19 @@ function AppContent() {
   }
 
   return (
-    <div className="app-container">
+    <div className="app-layout">
       <Navbar />
       <div className="app-body">
         <Sidebar />
         <main className="main-content">
           <Routes>
-            <Route path="/" element={
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
-            } />
-            <Route path="/appointments" element={
-              <ProtectedRoute allowedRoles={['doctor', 'staff', 'patient']}>
-                <Appointments />
-              </ProtectedRoute>
-            } />
-            <Route path="/patients" element={
-              <ProtectedRoute allowedRoles={['doctor', 'staff']}>
-                <Patients />
-              </ProtectedRoute>
-            } />
-            <Route path="/billing" element={
-              <ProtectedRoute allowedRoles={['doctor', 'staff', 'patient']}>
-                <Billing />
-              </ProtectedRoute>
-            } />
-            <Route path="/doctors" element={
-              <ProtectedRoute allowedRoles={['patient']}>
-                <Doctors />
-              </ProtectedRoute>
-            } />
-            <Route path="/feedback" element={
-              <ProtectedRoute allowedRoles={['doctor', 'patient']}>
-                <Feedback />
-              </ProtectedRoute>
-            } />
-            <Route path="/profile" element={
-              <ProtectedRoute>
-                <Profile />
-              </ProtectedRoute>
-            } />
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/appointments" element={<Appointments />} />
+            <Route path="/patients" element={<Patients />} />
+            <Route path="/billing" element={<Billing />} />
+            <Route path="/doctors" element={<Doctors />} />
+            <Route path="/feedback" element={<Feedback />} />
+            <Route path="/profile" element={<Profile />} />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </main>

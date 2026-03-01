@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../services/firebase';
+import logo from '../assets/logo.jpg';
 
 function Login() {
   const [email, setEmail] = useState('');
@@ -29,18 +30,22 @@ function Login() {
   return (
     <div className="login-container">
       <div className="login-box">
+
+        {/* LOGO SECTION */}
         <div className="login-logo">
-          <h1>🦷</h1>
-          <h2>Dental Clinic</h2>
-          <p>Appointment & Billing System</p>
+          <img src={logo} alt="Estandarte Dental Clinic Logo" className="logo-img" />
+          <h2 className="clinic-title">Estandarte Dental Clinic</h2>
+          <p className="clinic-subtitle">Appointment & Billing System</p>
         </div>
 
+        {/* ERROR MESSAGE */}
         {error && (
-          <div className="alert alert-danger">
+          <div className="error-message">
             {error}
           </div>
         )}
 
+        {/* FORM */}
         <form onSubmit={handleLogin}>
           <div className="form-group">
             <label className="form-label">Email</label>
@@ -66,22 +71,26 @@ function Login() {
             />
           </div>
 
-          <button 
-            type="submit" 
-            className="btn btn-primary btn-lg" 
-            style={{ width: '100%' }}
-            disabled={loading}
-          >
-            {loading ? 'Logging in...' : 'Login'}
-          </button>
+          {/* CENTERED LOGIN BUTTON */}
+          <div className="btn-container">
+            <button
+              type="submit"
+              className="btn btn-primary btn-lg"
+              disabled={loading}
+            >
+              {loading ? 'Logging in...' : 'Login'}
+            </button>
+          </div>
         </form>
 
-        <p style={{ textAlign: 'center', marginTop: '20px' }}>
-          Don't have an account?{' '}
-          <Link to="/register" style={{ color: 'var(--primary)' }}>
-            Register here
-          </Link>
-        </p>
+        {/* CENTERED REGISTER */}
+        <div className="register-link">
+          <p>
+            Don’t have an account?{" "}
+            <Link to="/register">Register here</Link>
+          </p>
+        </div>
+
       </div>
     </div>
   );

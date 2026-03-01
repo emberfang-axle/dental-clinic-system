@@ -3,7 +3,7 @@ import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { useAuth } from '../context/AuthContext';
 
-function Doctor() {
+function Doctors() {
   const { userData } = useAuth();
   const [doctors, setDoctors] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -85,7 +85,6 @@ function Doctor() {
                 style={{ marginTop: '20px' }}
                 onClick={() => {
                   setSelectedDoctor(null);
-                  // Navigate to appointments page with doctor pre-selected
                   window.location.href = '/appointments';
                 }}
               >
@@ -99,4 +98,4 @@ function Doctor() {
   );
 }
 
-export default Doctor;
+export default Doctors;
