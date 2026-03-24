@@ -4,38 +4,35 @@ import { useAuth } from '../context/AuthContext';
 
 function Sidebar() {
   const { userData } = useAuth();
+  const role = userData?.role;
 
   const getMenuItems = () => {
-    const role = userData?.role;
-    
-    const commonItems = [
-      { path: '/', label: 'Dashboard', icon: '📊' },
-    ];
+    if (role === 'doctor') {
+      return [
+        { path: '/doctor', label: 'Dashboard', icon: '📊' },
+        { path: '/doctor/appointments', label: 'Appointments', icon: '📅' },
+        { path: '/doctor/patients', label: 'Patients', icon: '👥' },
+        { path: '/feedback', label: 'Feedback', icon: '⭐' },
+      ];
+    }
 
-    const doctorItems = [
-      { path: '/appointments', label: 'Appointments', icon: '📅' },
-      { path: '/patients', label: 'Patients', icon: '👥' },
-      { path: '/billing', label: 'Billing', icon: '💰' },
-      { path: '/feedback', label: 'Feedback', icon: '⭐' },
-    ];
+    if (role === 'staff') {
+      return [
+        { path: '/staff', label: 'Dashboard', icon: '📊' },
+        { path: '/staff/doctors', label: 'Doctors', icon: '🦷' },
+        { path: '/staff/billing', label: 'Billing', icon: '💳' },
+      ];
+    }
 
-    const staffItems = [
-      { path: '/appointments', label: 'Appointments', icon: '📅' },
-      { path: '/patients', label: 'Patients', icon: '👥' },
-      { path: '/billing', label: 'Billing', icon: '💰' },
-    ];
+    if (role === 'patient') {
+      return [
+        { path: '/patient', label: 'Dashboard', icon: '📊' },
+        { path: '/patient/appointments', label: 'My Appointments', icon: '📅' },
+        { path: '/patient/profile', label: 'Profile', icon: '👤' },
+      ];
+    }
 
-    const patientItems = [
-      { path: '/appointments', label: 'My Appointments', icon: '📅' },
-      { path: '/doctors', label: 'Find Doctors', icon: '👨‍⚕️' },
-      { path: '/billing', label: 'My Bills', icon: '💰' },
-      { path: '/feedback', label: 'Feedback', icon: '⭐' },
-    ];
-
-    if (role === 'doctor') return [...commonItems, ...doctorItems];
-    if (role === 'staff') return [...commonItems, ...staffItems];
-    if (role === 'patient') return [...commonItems, ...patientItems];
-    return commonItems;
+    return [];
   };
 
   const menuItems = getMenuItems();
@@ -43,11 +40,13 @@ function Sidebar() {
   return (
     <aside className="sidebar">
       <ul className="sidebar-menu">
-        {menuItems.map((item, index) => (
-          <li key={index} className="sidebar-item">
-            <NavLink 
-              to={item.path} 
-              className={({ isActive }) => isActive ? 'sidebar-link active' : 'sidebar-link'}
+        {menuItems.map((item) => (
+          <li key={item.path} className="sidebar-item">
+            <NavLink
+              to={item.path}
+              className={({ isActive }) =>
+                isActive ? 'sidebar-link active' : 'sidebar-link'
+              }
             >
               <span className="sidebar-icon">{item.icon}</span>
               <span>{item.label}</span>

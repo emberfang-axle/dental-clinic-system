@@ -20,46 +20,55 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      setLoading(true);
+
+      if (!currentUser) {
+        setUser(null);
+        setUserData(null);
+        setLoading(false);
+        return;
+      }
+
       setUser(currentUser);
-      
-      if (currentUser) {
-        try {
-          const userDocRef = doc(db, 'users', currentUser.uid);
-          const userDoc = await getDoc(userDocRef);
-          
-          if (userDoc.exists()) {
-            const data = userDoc.data();
-            setUserData({
-              uid: currentUser.uid,
-              email: currentUser.email,
-              fullName: data.fullName || currentUser.displayName || currentUser.email.split('@')[0],
-              phone: data.phone || '',
-              role: data.role || 'patient',
-              ...data
-            });
-          } else {
-            setUserData({
-              uid: currentUser.uid,
-              email: currentUser.email,
-              fullName: currentUser.displayName || currentUser.email.split('@')[0],
-              phone: '',
-              role: 'patient'
-            });
-          }
-        } catch (error) {
-          console.error('Error fetching user data:', error);
+
+      try {
+        const userDocRef = doc(db, 'users', currentUser.uid);
+        const userDoc = await getDoc(userDocRef);
+
+        if (userDoc.exists()) {
+          const data = userDoc.data();
+
+          setUserData({
+            ...data,
+            uid: currentUser.uid,
+            email: currentUser.email,
+            fullName:
+              data.fullName ||
+              currentUser.displayName ||
+              currentUser.email.split('@')[0],
+            phone: data.phone || '',
+            role: data.role || null,
+          });
+        } else {
           setUserData({
             uid: currentUser.uid,
             email: currentUser.email,
             fullName: currentUser.displayName || currentUser.email.split('@')[0],
             phone: '',
-            role: 'patient'
+            role: null,
           });
         }
-      } else {
-        setUserData(null);
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+        setUserData({
+          uid: currentUser.uid,
+          email: currentUser.email,
+          fullName: currentUser.displayName || currentUser.email.split('@')[0],
+          phone: '',
+          role: null,
+        });
       }
-      
+
       setLoading(false);
     });
 

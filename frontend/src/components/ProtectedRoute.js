@@ -7,19 +7,25 @@ function ProtectedRoute({ children, allowedRoles = [] }) {
   const { user, userData, loading } = useAuth();
   const location = useLocation();
 
-  // Show loading while checking authentication
   if (loading) {
     return <Loading type="spinner" text="Verifying access..." />;
   }
 
-  // If not logged in, redirect to login
   if (!user) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // If roles are specified and user role is not allowed
-  if (allowedRoles.length > 0 && !allowedRoles.includes(userData?.role)) {
-    return <Navigate to="/" replace />;
+  const role = userData?.role;
+
+  if (!role) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (allowedRoles.length > 0 && !allowedRoles.includes(role)) {
+    if (role === "patient") return <Navigate to="/patient" replace />;
+    if (role === "doctor") return <Navigate to="/doctor" replace />;
+    if (role === "staff") return <Navigate to="/staff" replace />;
+    return <Navigate to="/login" replace />;
   }
 
   return children;
