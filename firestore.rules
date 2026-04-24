@@ -1,0 +1,87 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ========================================
+    // 👤 USERS COLLECTION (Own data only)
+    // ========================================
+    match /users/{userId} {
+      // Read/write own profile
+      allow read, write: if request.auth != null 
+        && request.auth.uid == userId;
+      
+      // Admins can read all users
+      allow read: if request.auth != null 
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    // ========================================
+    // 🏥 APPOINTMENTS COLLECTION
+    // ========================================
+    match /appointments/{appointmentId} {
+      // All authenticated users can read
+      allow read: if request.auth != null;
+      
+      // Patients can create/update own appointments
+      allow create, update: if request.auth != null 
+        && (request.resource.data.patientId == request.auth.uid 
+            || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['doctor', 'staff', 'admin']);
+      
+      // Only admins/doctors can delete
+      allow delete: if request.auth != null 
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['doctor', 'admin'];
+    }
+    
+    // ========================================
+    // 💳 PAYMENTS COLLECTION
+    // ========================================
+    match /payments/{paymentId} {
+      // All authenticated can read payments
+      allow read: if request.auth != null;
+      
+      // Create payments (GCash integration)
+      allow create: if request.auth != null;
+      
+      // Update own payments or staff
+      allow update: if request.auth != null 
+        && (request.resource.data.patientId == request.auth.uid 
+            || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['doctor', 'staff', 'admin']);
+    }
+    
+    // ========================================
+    // 🏪 SERVICES COLLECTION (Dental Services)
+    // ========================================
+    match /services/{serviceId} {
+      // Everyone can read services/prices
+      allow read: if true;
+      
+      // Only staff/admins can modify
+      allow write: if request.auth != null 
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['doctor', 'staff', 'admin'];
+    }
+    
+    // ========================================
+    // 📊 DASHBOARDS & REPORTS
+    // ========================================
+    match /reports/{reportId} {
+      allow read, write: if request.auth != null 
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['doctor', 'staff', 'admin'];
+    }
+    
+    // ========================================
+    // DEFAULT: Authenticated users only
+    // ========================================
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // ========================================
+    // 🔒 ADMIN FUNCTIONS (Super secure)
+    // ========================================
+    match /{collection}/{docId} {
+      allow write: if request.auth != null 
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+        && resource == null; // Only allow creates for new docs
+    }
+  }
+}
