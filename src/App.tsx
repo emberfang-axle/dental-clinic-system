@@ -1,28 +1,23 @@
 import { useEffect, useState } from "react";
-
 import { useStore } from "./store/store";
 import { canAccessRoute, dashboardPathFor } from "./shared/helpers";
 import { ROUTES } from "./shared/constants";
-
-
 import { LandingPage } from "./modules/landing/LandingPage";
 import { LoginPage, RegisterPage } from "./modules/auth/AuthPage";
+import { AdminLoginPage } from "./modules/auth/AdminLoginPage";
 import { BookAppointmentPage } from "./modules/appointment/BookAppointmentPage";
+import { AdminDashboard } from "./modules/admin/AdminDashboard";
 import { DoctorDashboard } from "./modules/doctor/DoctorDashboard";
 import { StaffDashboard } from "./modules/staff/StaffDashboard";
 import { PatientDashboard } from "./modules/patient/PatientDashboard";
+import { SetupPage } from "./modules/setup/SetupPage";
 
 export default function App() {
-  const [path, setPath] = useState<string>(
-    () => window.location.hash.replace(/^#/, "") || ROUTES.home
-  );
-
+  const [path, setPath] = useState(() => window.location.hash.replace(/^#/, "") || ROUTES.home);
   const { user } = useStore();
 
   useEffect(() => {
-    const onHash = () =>
-      setPath(window.location.hash.replace(/^#/, "") || ROUTES.home);
-
+    const onHash = () => setPath(window.location.hash.replace(/^#/, "") || ROUTES.home);
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
@@ -33,56 +28,35 @@ export default function App() {
     window.scrollTo({ top: 0 });
   }
 
-  /* ─────────── Safe user check ─────────── */
   const role = user?.role;
+  const isDashboard = path.startsWith(ROUTES.dashboard);
 
-  /* ─────────── Route guards ─────────── */
-
+  // Redirect /dashboard to role-specific dashboard
   if (path === ROUTES.dashboard) {
-    if (!user || !role) {
-      setTimeout(() => navigate(ROUTES.login), 0);
-      return null;
-    }
-
-    setTimeout(() => navigate(dashboardPathFor(role)), 0);
+    setTimeout(() => navigate(user ? dashboardPathFor(role!) : ROUTES.login), 0);
     return null;
   }
 
-  const isDashboardRoute = path.startsWith(ROUTES.dashboard);
-
-  if (isDashboardRoute && !user) {
+  // Guard all /dashboard/* routes
+  if (isDashboard && !user) {
     setTimeout(() => navigate(ROUTES.login), 0);
     return null;
   }
-
-  if (isDashboardRoute && user && !canAccessRoute(path, role)) {
+  if (isDashboard && user && !canAccessRoute(path, role)) {
     setTimeout(() => navigate(dashboardPathFor(role!)), 0);
     return null;
   }
 
-  /* ─────────── Public routes ─────────── */
-
-  if (path === ROUTES.login)
-    return <LoginPage navigate={navigate} />;
-
-  if (path === ROUTES.register)
-    return <RegisterPage navigate={navigate} />;
-
-  if (path === ROUTES.book)
-    return <BookAppointmentPage navigate={navigate} />;
-
-  /* ─────────── Dashboards ─────────── */
-
-  if (path === ROUTES.doctorDashboard)
-    return <DoctorDashboard navigate={navigate} />;
-
-  if (path === ROUTES.staffDashboard)
-    return <StaffDashboard navigate={navigate} />;
-
-  if (path === ROUTES.patientDashboard)
-    return <PatientDashboard navigate={navigate} />;
-
-  /* ─────────── Default ─────────── */
-
-  return <LandingPage navigate={navigate} />;
+  switch (path) {
+    case ROUTES.login:        return <LoginPage navigate={navigate} />;
+    case ROUTES.adminLogin:   return <AdminLoginPage navigate={navigate} />;
+    case ROUTES.register:     return <RegisterPage navigate={navigate} />;
+    case ROUTES.book:         return <BookAppointmentPage navigate={navigate} />;
+    case "/setup":            return <SetupPage navigate={navigate} />;
+    case ROUTES.adminDashboard:   return <AdminDashboard navigate={navigate} />;
+    case ROUTES.doctorDashboard:  return <DoctorDashboard navigate={navigate} />;
+    case ROUTES.staffDashboard:   return <StaffDashboard navigate={navigate} />;
+    case ROUTES.patientDashboard: return <PatientDashboard navigate={navigate} />;
+    default:                  return <LandingPage navigate={navigate} />;
+  }
 }

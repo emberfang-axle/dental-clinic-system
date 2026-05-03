@@ -1,87 +1,103 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // ========================================
-    // 👤 USERS COLLECTION (Own data only)
-    // ========================================
+
+    function callerRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isAdminOrDoctor() {
+      return callerRole() in ['admin', 'doctor'];
+    }
+
+    function isStaffOrAbove() {
+      return callerRole() in ['admin', 'doctor', 'staff'];
+    }
+
+    // ── USERS ──────────────────────────────────────────────
     match /users/{userId} {
-      // Read/write own profile
-      allow read, write: if request.auth != null 
-        && request.auth.uid == userId;
-      
-      // Admins can read all users
-      allow read: if request.auth != null 
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      // Own profile: always readable/updatable
+      allow read, update: if request.auth != null && request.auth.uid == userId;
+
+      // Self-create: patients only
+      allow create: if request.auth != null
+        && request.auth.uid == userId
+        && request.resource.data.role == 'patient';
+
+      // Any authenticated user can read the users list (needed for staff/doctor lookups)
+      // Write (create/update others) restricted to admin/doctor
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null && isAdminOrDoctor();
     }
-    
-    // ========================================
-    // 🏥 APPOINTMENTS COLLECTION
-    // ========================================
+
+    // ── APPOINTMENTS ───────────────────────────────────────
     match /appointments/{appointmentId} {
-      // All authenticated users can read
-      allow read: if request.auth != null;
-      
-      // Patients can create/update own appointments
-      allow create, update: if request.auth != null 
-        && (request.resource.data.patientId == request.auth.uid 
-            || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['doctor', 'staff', 'admin']);
-      
-      // Only admins/doctors can delete
-      allow delete: if request.auth != null 
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['doctor', 'admin'];
+      // Patients: only their own
+      allow read: if request.auth != null
+        && resource.data.patientId == request.auth.uid;
+
+      // Staff/doctor/admin: all
+      allow read: if request.auth != null && isStaffOrAbove();
+
+      // Create: patient for themselves, or staff/doctor/admin
+      allow create: if request.auth != null
+        && (request.resource.data.patientId == request.auth.uid || isStaffOrAbove());
+
+      // Update: patient for their own, or staff/doctor/admin
+      allow update: if request.auth != null
+        && (resource.data.patientId == request.auth.uid || isStaffOrAbove());
+
+      // Delete: doctor/admin only
+      allow delete: if request.auth != null && isAdminOrDoctor();
     }
-    
-    // ========================================
-    // 💳 PAYMENTS COLLECTION
-    // ========================================
-    match /payments/{paymentId} {
-      // All authenticated can read payments
-      allow read: if request.auth != null;
-      
-      // Create payments (GCash integration)
-      allow create: if request.auth != null;
-      
-      // Update own payments or staff
-      allow update: if request.auth != null 
-        && (request.resource.data.patientId == request.auth.uid 
-            || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['doctor', 'staff', 'admin']);
-    }
-    
-    // ========================================
-    // 🏪 SERVICES COLLECTION (Dental Services)
-    // ========================================
+
+    // ── SERVICES (public read) ─────────────────────────────
     match /services/{serviceId} {
-      // Everyone can read services/prices
       allow read: if true;
-      
-      // Only staff/admins can modify
-      allow write: if request.auth != null 
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['doctor', 'staff', 'admin'];
+      allow write: if request.auth != null && isAdminOrDoctor();
     }
-    
-    // ========================================
-    // 📊 DASHBOARDS & REPORTS
-    // ========================================
+
+    // ── SETTINGS ──────────────────────────────────────────
+    match /settings/{docId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && isAdminOrDoctor();
+    }
+
+    // ── PAYMENTS ──────────────────────────────────────────
+    match /payments/{paymentId} {
+      allow read: if request.auth != null
+        && (resource.data.patientId == request.auth.uid || isStaffOrAbove());
+      allow create: if request.auth != null;
+      allow update: if request.auth != null
+        && (resource.data.patientId == request.auth.uid || isStaffOrAbove());
+    }
+
+    // ── NOTIFICATIONS ─────────────────────────────────────
+    match /notifications/{notifId} {
+      // Any authenticated user can create (system sends to any userId)
+      allow create: if request.auth != null;
+      // Read/update/delete own notifications only, or admin/doctor
+      allow read, update, delete: if request.auth != null
+        && (resource.data.userId == request.auth.uid || isAdminOrDoctor());
+    }
+
+    // ── FEEDBACK ──────────────────────────────────────────
+    match /feedbacks/{feedbackId} {
+      allow read: if true;  // public — shown on landing page
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null
+        && (resource.data.userId == request.auth.uid || isAdminOrDoctor());
+    }
+
+    // ── LOGS ──────────────────────────────────────────────
+    match /logs/{logId} {
+      allow read: if request.auth != null && isAdminOrDoctor();
+      allow create: if request.auth != null;
+    }
+
+    // ── REPORTS ───────────────────────────────────────────
     match /reports/{reportId} {
-      allow read, write: if request.auth != null 
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['doctor', 'staff', 'admin'];
-    }
-    
-    // ========================================
-    // DEFAULT: Authenticated users only
-    // ========================================
-    match /{document=**} {
-      allow read, write: if request.auth != null;
-    }
-    
-    // ========================================
-    // 🔒 ADMIN FUNCTIONS (Super secure)
-    // ========================================
-    match /{collection}/{docId} {
-      allow write: if request.auth != null 
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
-        && resource == null; // Only allow creates for new docs
+      allow read, write: if request.auth != null && isAdminOrDoctor();
     }
   }
 }

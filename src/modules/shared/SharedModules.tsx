@@ -18,6 +18,7 @@ import { paymentsService } from "../../services/payments";
 import { appointmentsService } from "../../services/appointments";
 import { useStore } from "../../store/store";
 import { formatDateTime, initials, roleLabel } from "../../shared/helpers";
+import { downloadInvoice } from "../../utils/invoice";
 import type { Role, Appointment, Service, FeedbackEntry, AuditLog, NotificationEntry } from "../../shared/types";
 
 // Helper type for appointment status filtering
@@ -131,6 +132,7 @@ export function PaymentsPage({ role }: { role: Role }) {
                 <th>Receipt</th>
                 <th>Reference</th>
                 <th className="text-right">Amount</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -142,6 +144,15 @@ export function PaymentsPage({ role }: { role: Role }) {
                   <td className="text-xs text-gold-300">{a.receiptNumber || "—"}</td>
                   <td className="font-mono text-xs text-gold-100/55">{a.gcashRef || "—"}</td>
                   <td className="text-right font-mono text-gold-300">₱{a.price.toLocaleString()}</td>
+                  <td className="text-right">
+                    <button
+                      onClick={() => downloadInvoice(a)}
+                      disabled={a.status !== "completed" || a.paymentStatus !== "paid"}
+                      className="text-xs text-gold-400 hover:text-gold-100 underline transition whitespace-nowrap disabled:opacity-30 disabled:cursor-not-allowed disabled:no-underline"
+                    >
+                      Invoice
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>

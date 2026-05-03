@@ -11,6 +11,7 @@ import { paymentsService } from "../../services/payments";
 import { useStore } from "../../store/store";
 import { DASHBOARD_TABS, ROUTES } from "../../shared/constants";
 import { formatDateTime, receiptHref } from "../../shared/helpers";
+import { downloadInvoice } from "../../utils/invoice";
 import type { Appointment } from "../../shared/types";
 import { AppointmentsList } from "../appointment/AppointmentsList";
 import { PaymentBadge } from "../appointment/AppointmentsList";
@@ -55,7 +56,7 @@ export function PatientDashboard({ navigate }: { navigate: (p: string) => void }
 function PatientPaymentCenter() {
   const { appointments, user, settings } = useStore();
   const mine = appointments
-    .filter((a) => a.patientId === user!.id)
+    .filter((a) => a.patientId === user!.id && a.status !== "cancelled")
     .sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
   const [drafts, setDrafts] = useState<AppointmentDraftMap>({});
 
@@ -106,6 +107,14 @@ function PatientPaymentCenter() {
                     Download Receipt
                   </a>
                 )}
+                <button
+                  onClick={() => downloadInvoice(a)}
+                  disabled={a.status !== "completed" || a.paymentStatus !== "paid"}
+                  title={a.status !== "completed" ? "Available after appointment is completed" : a.paymentStatus !== "paid" ? "Available after payment is confirmed" : "Download Invoice"}
+                  className="text-sm text-gold-300 hover:text-gold-100 underline transition disabled:opacity-30 disabled:cursor-not-allowed disabled:no-underline"
+                >
+                  Download Invoice
+                </button>
               </div>
 
               {a.paymentMethod === "gcash" ? (
@@ -247,9 +256,9 @@ function FeedbackPage() {
 
         <Button
           className="mt-5"
-          onClick={() => {
+          onClick={async () => {
             if (!text.trim()) return;
-            feedbackService.submit({
+            await feedbackService.submit({
               userId: user!.id,
               userName: user!.name,
               stars,

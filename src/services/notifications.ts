@@ -1,50 +1,51 @@
 import type { NotificationEntry, NotificationKind } from "../shared/types";
+import { addDocTyped, updateDocTyped, listCollection, qWhere } from "./firestore";
 import { getSnapshot, setState } from "../store/store";
 
-function nowISO() {
-  return new Date().toISOString();
-}
+function nowISO() { return new Date().toISOString(); }
 
-function makeId(prefix: string) {
-  return `${prefix}_${Math.random().toString(16).slice(2)}_${Date.now().toString(16)}`;
+async function persist(entry: Omit<NotificationEntry, "id">): Promise<NotificationEntry> {
+  const id = await addDocTyped("notifications", entry as any);
+  const n = { ...entry, id } as NotificationEntry;
+  // Optimistic local update for the current user
+  const snap = getSnapshot();
+  if (snap.user?.id === entry.userId) {
+    setState({ notifications: [n, ...snap.notifications] });
+  }
+  return n;
 }
 
 export const notificationsService = {
-  push(input: Omit<NotificationEntry, "id" | "at" | "read">) {
-    const snap = getSnapshot();
-    const n: NotificationEntry = {
-      ...input,
-      id: makeId("n"),
-      at: nowISO(),
-      read: false,
-    };
-    setState({ notifications: [n, ...snap.notifications] });
-    return n;
+  async push(input: Omit<NotificationEntry, "id" | "at" | "read">): Promise<NotificationEntry> {
+    return persist({ ...input, at: nowISO(), read: false });
   },
 
-  system(userId: string, title: string, message: string, kind: NotificationKind = "system") {
+  /** Notify a single user. */
+  async notify(userId: string, title: string, message: string, kind: NotificationKind = "system") {
     return this.push({ userId, title, message, kind });
   },
 
-  markRead(id: string) {
+  /** Notify all staff and doctors (used when a patient books). */
+  async notifyStaff(title: string, message: string, kind: NotificationKind = "appointment") {
+    const { users } = getSnapshot();
+    const targets = users.filter((u) => u.role === "staff" || u.role === "doctor");
+    await Promise.all(targets.map((u) => this.push({ userId: u.id, title, message, kind })));
+  },
+
+  async markRead(id: string) {
+    await updateDocTyped<NotificationEntry>("notifications", id, { read: true } as any);
     const snap = getSnapshot();
     setState({
-      notifications: snap.notifications.map((n) => (n.id === id ? { ...n, read: true } : n)),
+      notifications: snap.notifications.map((n) => n.id === id ? { ...n, read: true } : n),
     });
   },
 
-  markAllRead(userId: string) {
+  async markAllRead(userId: string) {
     const snap = getSnapshot();
+    const unread = snap.notifications.filter((n) => n.userId === userId && !n.read);
+    await Promise.all(unread.map((n) => updateDocTyped<NotificationEntry>("notifications", n.id, { read: true } as any)));
     setState({
-      notifications: snap.notifications.map((n) =>
-        n.userId === userId ? { ...n, read: true } : n
-      ),
+      notifications: snap.notifications.map((n) => n.userId === userId ? { ...n, read: true } : n),
     });
-  },
-
-  clearUser(userId: string) {
-    const snap = getSnapshot();
-    setState({ notifications: snap.notifications.filter((n) => n.userId !== userId) });
   },
 };
-

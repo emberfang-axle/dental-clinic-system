@@ -1,36 +1,33 @@
 import type { FeedbackEntry } from "../shared/types";
+import { addDocTyped } from "./firestore";
 import { getSnapshot, setState } from "../store/store";
+import { notificationsService } from "./notifications";
 
-function nowISO() {
-  return new Date().toISOString();
-}
-
-function makeId(prefix: string) {
-  return `${prefix}_${Math.random().toString(16).slice(2)}_${Date.now().toString(16)}`;
-}
+function nowISO() { return new Date().toISOString(); }
 
 export const feedbackService = {
-  submit(input: Omit<FeedbackEntry, "id" | "at">) {
-    const snap = getSnapshot();
-    const entry: FeedbackEntry = { ...input, id: makeId("fb"), at: nowISO() };
-    setState({ feedbacks: [entry, ...snap.feedbacks] });
-    return entry;
-  },
+  async submit(input: Omit<FeedbackEntry, "id" | "at">) {
+    const entry: FeedbackEntry = { ...input, id: "", at: nowISO() };
+    const id = await addDocTyped("feedbacks", { ...entry } as any);
+    const saved = { ...entry, id } as FeedbackEntry;
 
-  submitLegacy(
-    userId: string,
-    userName: string,
-    stars: number,
-    text: string,
-    appointmentId?: string
-  ) {
-    return this.submit({
-      userId,
-      userName,
-      stars,
-      text,
-      appointmentId,
-    });
+    const snap = getSnapshot();
+    setState({ feedbacks: [saved, ...snap.feedbacks] });
+
+    // Notify all doctors and staff about the new feedback
+    const targets = snap.users.filter((u) => u.role === "doctor" || u.role === "staff");
+    const stars = "⭐".repeat(input.stars);
+    await Promise.all(
+      targets.map((d) =>
+        notificationsService.notify(
+          d.id,
+          `New Patient Feedback ${stars}`,
+          `${input.userName} left a ${input.stars}-star review: "${input.text.slice(0, 80)}${input.text.length > 80 ? "…" : ""}"`,
+          "system"
+        )
+      )
+    );
+
+    return saved;
   },
 };
-

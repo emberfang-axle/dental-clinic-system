@@ -1,275 +1,116 @@
 import { useState } from "react";
-
-// Replace with your actual UI components
 import { Badge, Button, Card, Input, Select } from "../../components/ui";
-
 import { appointmentsService } from "../../services/appointments";
 import { paymentsService } from "../../services/payments";
-
-// Replace with your actual store hook
+import { notificationsService } from "../../services/notifications";
 import { useStore } from "../../store/store";
-
-// Replace with your actual types
+import { getSnapshot } from "../../store/store";
 import type { Appointment, AppointmentStatus, PaymentStatus, Role } from "../../shared/types";
 
-/* =========================
-   MAIN LIST COMPONENT
-========================= */
-export function AppointmentsList({
-  role,
-  patientOnly,
-}: {
-  role: Role;
-  patientOnly?: boolean;
-}) {
-  const { appointments = [], user } = useStore() || {}; // ✅ safe fallback
-
+export function AppointmentsList({ role, patientOnly }: { role: Role; patientOnly?: boolean }) {
+  const { appointments = [], user } = useStore();
   const [filter, setFilter] = useState<"all" | AppointmentStatus>("all");
   const [search, setSearch] = useState("");
 
-  if (!appointments || !Array.isArray(appointments)) {
-    return <Card>Loading appointments...</Card>;
-  }
-
   let list = patientOnly && user
     ? appointments.filter((a) => a.patientId === user.id)
-    : appointments;
+    : [...appointments];
 
-  if (filter !== "all") {
-    list = list.filter((a) => a.status === filter);
-  }
-
+  if (filter !== "all") list = list.filter((a) => a.status === filter);
   if (search) {
-    list = list.filter((a) =>
-      `${a.patientName}${a.serviceName}${a.gcashRef || ""}`
-        .toLowerCase()
-        .includes(search.toLowerCase())
-    );
+    const q = search.toLowerCase();
+    list = list.filter((a) => `${a.patientName}${a.serviceName}${a.gcashRef || ""}`.toLowerCase().includes(q));
   }
-
-  // sort latest first
-  list = [...list].sort((a, b) =>
-    (b.date + b.time).localeCompare(a.date + a.time)
-  );
+  list = list.sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
 
   return (
     <div className="space-y-4">
-      {/* FILTER BAR */}
       <Card className="!p-4">
-        <div className="flex items-center gap-3 flex-wrap">
-          <Input
-            placeholder="Search patient, service, or reference…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="max-w-sm"
-          />
-
-          <Select
-            value={filter}
-            onChange={(e) =>
-              setFilter(e.target.value as "all" | AppointmentStatus)
-            }
-            className="max-w-[180px]"
-          >
+        <div className="flex flex-wrap items-center gap-3">
+          <Input placeholder="Search patient, service…" value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-xs" />
+          <Select value={filter} onChange={(e) => setFilter(e.target.value as any)} className="max-w-[160px]">
             <option value="all">All statuses</option>
             <option value="pending">Pending</option>
             <option value="confirmed">Confirmed</option>
             <option value="completed">Completed</option>
             <option value="cancelled">Cancelled</option>
           </Select>
-
-          <span className="text-xs text-gold-100/50 ml-auto">
-            {list.length} appointment(s)
-          </span>
+          <span className="text-xs text-gold-100/50 ml-auto">{list.length} appointment(s)</span>
         </div>
       </Card>
 
-      {/* TABLE */}
-      <Card className="!p-0 overflow-hidden">
-        <AppointmentTable appointments={list} role={role} />
-      </Card>
-    </div>
-  );
-}
+      {list.length === 0 && <Card><p className="text-sm text-gold-100/50 text-center py-4">No appointments found.</p></Card>}
 
-/* =========================
-   TABLE
-========================= */
-export function AppointmentTable({
-  appointments,
-  role,
-  compact,
-}: {
-  appointments: Appointment[];
-  role: Role;
-  compact?: boolean;
-}) {
-  const { user } = useStore() || {};
-
-  if (!appointments || !appointments.length) {
-    return (
-      <div className="p-8 text-center text-gold-100/50">
-        No appointments found.
+      <div className="space-y-3">
+        {list.map((a) => (
+          <AppointmentCard key={a.id} a={a} role={role} isSelf={a.patientId === user?.id} actor={user?.name || "system"} />
+        ))}
       </div>
-    );
-  }
-
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm min-w-[760px]">
-        <thead className="bg-ink-800/60 text-left text-xs uppercase tracking-wider text-gold-200/70">
-          <tr>
-            {!compact && <th className="px-4 py-3">Patient</th>}
-            <th className="px-4 py-3">Service</th>
-            <th className="px-4 py-3">Date / Time</th>
-            <th className="px-4 py-3">Price</th>
-            <th className="px-4 py-3">Status</th>
-            <th className="px-4 py-3">Payment</th>
-            <th className="px-4 py-3 text-right">Actions</th>
-          </tr>
-        </thead>
-
-        <tbody>
-          {appointments.map((a) => (
-            <tr
-              key={a.id}
-              className="border-t border-gold-500/10 hover:bg-gold-500/5"
-            >
-              {!compact && (
-                <td className="px-4 py-3">
-                  {a.emergency && <Badge tone="emergency">Priority</Badge>}
-                  <div>{a.patientName}</div>
-                </td>
-              )}
-
-              <td className="px-4 py-3">{a.serviceName}</td>
-
-              <td className="px-4 py-3">
-                {a.date}
-                <br />
-                <span className="text-xs text-gold-100/50">
-                  {a.time}
-                </span>
-              </td>
-
-              <td className="px-4 py-3 font-mono">
-                ₱{a.price?.toLocaleString?.() ?? "0"}
-              </td>
-
-              <td className="px-4 py-3">
-                <Badge tone={a.status}>{a.status}</Badge>
-              </td>
-
-              <td className="px-4 py-3">
-                <PaymentBadge
-                  status={a.paymentStatus}
-                  method={a.paymentMethod === "gcash" ? "GCash" : "Cash"}
-                />
-              </td>
-
-              <td className="px-4 py-3 text-right">
-                <ApptActions
-                  a={a}
-                  role={role}
-                  self={a.patientId === user?.id}
-                />
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
     </div>
   );
 }
 
-/* =========================
-   PAYMENT BADGE
-========================= */
-export function PaymentBadge({
-  status,
-  method,
-}: {
-  status: PaymentStatus;
-  method: string;
-}) {
-  const map: Record<
-    PaymentStatus,
-    { tone: any; text: string }
-  > = {
-    unpaid: { tone: "neutral", text: "Unpaid" },
-    pending_verification: { tone: "pending", text: "Pending" },
-    verified: { tone: "confirmed", text: "Verified" },
-    paid: { tone: "paid", text: "Paid" },
-  };
-
-  const s = map[status] || { tone: "neutral", text: "Unknown" };
+function AppointmentCard({ a, role, isSelf, actor }: { a: Appointment; role: Role; isSelf: boolean; actor: string }) {
+  const update = (data: Partial<Appointment>) => appointmentsService.update(a.id, data, actor);
 
   return (
-    <div>
+    <Card>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          {role !== "patient" && <p className="font-semibold text-gold-100">{a.patientName}</p>}
+          <p className="text-gold-100/80 font-medium">{a.serviceName}</p>
+          <p className="text-sm text-gold-100/55 mt-0.5">{a.date} · {a.time} · {a.doctor}</p>
+        </div>
+        <div className="flex flex-wrap gap-2 items-center">
+          {a.emergency && <Badge tone="emergency">Priority</Badge>}
+          <Badge tone={a.status as any}>{a.status}</Badge>
+          <PaymentBadge status={a.paymentStatus} method={a.paymentMethod === "gcash" ? "GCash" : "Cash"} />
+        </div>
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        {role === "doctor" && a.status === "pending" && (
+          <Button size="sm" onClick={() => update({ status: "confirmed" })}>Confirm</Button>
+        )}
+        {role === "doctor" && a.status === "confirmed" && (
+          <Button size="sm" onClick={() => update({ status: "completed" })}>Complete</Button>
+        )}
+        {(role === "doctor" || role === "staff") && a.paymentStatus === "pending_verification" && (
+          <Button size="sm" onClick={() => paymentsService.verify(a.id, actor)}>Verify Payment</Button>
+        )}
+        {role === "staff" && a.status === "pending" && (
+          <Button size="sm" onClick={() => update({ status: "confirmed" })}>Confirm</Button>
+        )}
+        {role === "patient" && isSelf && (a.status === "pending" || a.status === "confirmed") && (
+          <Button size="sm" variant="ghost" onClick={async () => {
+            await update({ status: "cancelled" });
+            const { users } = getSnapshot();
+            const targets = users.filter((u) => u.role === "staff" || u.role === "doctor");
+            await Promise.all(targets.map((u) =>
+              notificationsService.notify(u.id, "Appointment Cancelled",
+                `${a.patientName} cancelled their ${a.serviceName} appointment on ${a.date} at ${a.time}.`, "appointment")
+            ));
+          }}>
+            Cancel
+          </Button>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+export function PaymentBadge({ status, method }: { status: PaymentStatus; method: string }) {
+  const map: Record<PaymentStatus, { tone: any; text: string }> = {
+    unpaid:               { tone: "neutral",   text: "Unpaid" },
+    pending_verification: { tone: "pending",   text: "Pending" },
+    verified:             { tone: "confirmed", text: "Verified" },
+    paid:                 { tone: "paid",      text: "Paid" },
+  };
+  const s = map[status] || { tone: "neutral", text: status };
+  return (
+    <div className="flex flex-col items-start gap-0.5">
       <Badge tone={s.tone}>{s.text}</Badge>
-      <div className="text-xs opacity-60">{method}</div>
+      <span className="text-[10px] text-gold-100/45">{method}</span>
     </div>
   );
-}
-
-/* =========================
-   ACTION BUTTONS
-========================= */
-function ApptActions({
-  a,
-  role,
-  self,
-}: {
-  a: Appointment;
-  role: Role;
-  self: boolean;
-}) {
-  const { user } = useStore() || {};
-  const actor = user?.name || "System";
-
-  const update = (data: Partial<Appointment>) => {
-    if (appointmentsService?.update) {
-      appointmentsService.update(a.id, data, actor);
-    }
-  };
-
-  const verify = () => {
-    if (paymentsService?.verify) {
-      paymentsService.verify(a.id, actor);
-    }
-  };
-
-  const buttons: React.ReactNode[] = [];
-
-  // DOCTOR
-  if (role === "doctor") {
-    if (a.status === "pending")
-      buttons.push(<Button size="sm" onClick={() => update({ status: "confirmed" })}>Confirm</Button>);
-
-    if (a.status === "confirmed")
-      buttons.push(<Button size="sm" onClick={() => update({ status: "completed" })}>Complete</Button>);
-
-    if (a.paymentStatus === "pending_verification")
-      buttons.push(<Button size="sm" onClick={verify}>Verify</Button>);
-
-    if (a.paymentStatus === "verified")
-      buttons.push(<Button size="sm" onClick={() => update({ paymentStatus: "paid" })}>Mark Paid</Button>);
-  }
-
-  // STAFF
-  if (role === "staff") {
-    if (a.paymentStatus === "pending_verification")
-      buttons.push(<Button size="sm" onClick={verify}>Verify</Button>);
-  }
-
-  // PATIENT
-  if (role === "patient" && self && a.status === "pending") {
-    buttons.push(
-      <Button size="sm" onClick={() => update({ status: "cancelled" })}>
-        Cancel
-      </Button>
-    );
-  }
-
-  return <div className="flex gap-2 justify-end">{buttons}</div>;
 }

@@ -17,12 +17,14 @@ export function initials(name: string): string {
 }
 
 export function shortRole(role: Role): string {
+  if (role === "admin") return "Admin";
   if (role === "doctor") return "Doctor";
   if (role === "staff") return "Staff";
   return "Patient";
 }
 
 export function roleLabel(role: Role): string {
+  if (role === "admin") return "Admin · System Owner";
   if (role === "doctor") return "Doctor · Owner / Admin";
   if (role === "staff") return "Staff · Admin Support";
   return "Patient · Client";
@@ -48,6 +50,7 @@ export function receiptHref(a: Appointment): string {
 
 /** Map a role to its dashboard route. */
 export function dashboardPathFor(role: Role): string {
+  if (role === "admin") return ROUTES.adminDashboard;
   if (role === "doctor") return ROUTES.doctorDashboard;
   if (role === "staff") return ROUTES.staffDashboard;
   return ROUTES.patientDashboard;
@@ -57,6 +60,9 @@ export function canAccessRoute(path: string, role: Role | undefined): boolean {
   if (!path.startsWith(ROUTES.dashboard)) return true;
   if (!role) return false;
   if (path === ROUTES.dashboard) return true;
+  // Admin can access admin dashboard
+  if (path === ROUTES.adminDashboard) return role === "admin" || role === "doctor";
+  // Doctor can access doctor dashboard
   if (path === ROUTES.doctorDashboard) return role === "doctor";
   if (path === ROUTES.staffDashboard) return role === "staff";
   if (path === ROUTES.patientDashboard) return role === "patient";

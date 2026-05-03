@@ -79,10 +79,23 @@ function StaffQueue() {
                       {a.emergency ? <Badge tone="emergency">Emergency</Badge> : <Badge tone="neutral">Regular</Badge>}
                     </div>
                     <div className="mt-4 flex flex-wrap gap-2">
-                      {a.status === "pending" && <Button size="sm" onClick={() => appointmentsService.update(a.id, { status: "confirmed" }, user!.name)}>Confirm</Button>}
-                      {a.status === "confirmed" && <Button size="sm" variant="subtle" onClick={() => appointmentsService.update(a.id, { status: "completed" }, user!.name)}>Complete</Button>}
-                      {a.paymentMethod === "cash" && a.status === "completed" && a.paymentStatus !== "paid" && (
-                        <Button size="sm" onClick={() => appointmentsService.update(a.id, { paymentStatus: "paid" }, user!.name)}>Mark Cash Paid</Button>
+                      {a.status === "pending" && <Button size="sm" onClick={() => { void appointmentsService.update(a.id, { status: "confirmed" }, user!.name); }}>Confirm</Button>}
+                      {a.status === "confirmed" && <Button size="sm" variant="subtle" onClick={() => { void appointmentsService.update(a.id, { status: "completed" }, user!.name); }}>Complete</Button>}
+                      {a.status === "completed" && a.paymentStatus !== "paid" && (
+                        <div className="w-full space-y-2">
+                          <p className="text-xs text-gold-100/60">Select payment method:</p>
+                          <div className="flex gap-2">
+                            <Button size="sm" onClick={() => { void appointmentsService.update(a.id, { paymentMethod: "cash", paymentStatus: "paid" }, user!.name); }}>
+                              Cash
+                            </Button>
+                            <Button size="sm" variant="subtle" onClick={() => { void appointmentsService.update(a.id, { paymentMethod: "gcash", paymentStatus: "pending_verification" }, user!.name); }}>
+                              GCash
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                      {a.status === "completed" && a.paymentStatus === "paid" && (
+                        <span className="text-xs text-emerald-400">✓ Paid via {a.paymentMethod}</span>
                       )}
                     </div>
                   </div>

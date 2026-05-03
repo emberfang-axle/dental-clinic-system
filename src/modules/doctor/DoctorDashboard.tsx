@@ -10,6 +10,8 @@ import { DashboardLayout } from "../../components/layout/DashboardLayout";
 import { calendarService } from "../../services/calendar";
 import { recordsService } from "../../services/records";
 import { settingsService } from "../../services/settings";
+import { authService } from "../../services/auth";
+import { deleteDocTyped } from "../../services/firestore";
 import { useStore } from "../../store/store";
 import { BOOKING, DASHBOARD_TABS } from "../../shared/constants";
 import type { ClinicSettings, StaffPermission } from "../../shared/types";
@@ -314,8 +316,10 @@ function DoctorScheduleRules() {
 function StaffAccountsPage() {
   const { users, staffPermissions, user } = useStore();
   const staffUsers = users.filter((u) => u.role === "staff");
-  const [newStaff, setNewStaff] = useState({ name: "", email: "", phone: "" });
+  const [newStaff, setNewStaff] = useState({ name: "", email: "", phone: "", password: "" });
   const [created, setCreated] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState("");
 
   const permissionFor = (staffId: string): StaffPermission =>
     staffPermissions.find((p) => p.staffId === staffId) || {
@@ -344,7 +348,18 @@ function StaffAccountsPage() {
                       <div className="text-lg font-medium text-gold-100">{staff.name}</div>
                       <div className="text-sm text-gold-100/50">{staff.email} · {staff.phone}</div>
                     </div>
-                    <Badge tone="confirmed">Active staff</Badge>
+                    <div className="flex items-center gap-2">
+                      <Badge tone="confirmed">Active staff</Badge>
+                      <button
+                        onClick={async () => {
+                          if (!confirm(`Remove ${staff.name} from staff?`)) return;
+                          await deleteDocTyped("users", staff.id);
+                        }}
+                        className="text-xs text-red-400/70 hover:text-red-400 transition px-2 py-1 rounded border border-red-500/20 hover:border-red-500/50"
+                      >
+                        Remove
+                      </button>
+                    </div>
                   </div>
                   <div className="mt-4 grid sm:grid-cols-2 xl:grid-cols-4 gap-3">
                     <PermissionToggle label="Appointments" enabled={permissions.appointments} onToggle={() => settingsService.updateStaffPermission(staff.id, { appointments: !permissions.appointments }, user!.name)} />
@@ -367,20 +382,32 @@ function StaffAccountsPage() {
             <div><Label>Full Name</Label><Input value={newStaff.name} onChange={(e) => setNewStaff((p) => ({ ...p, name: e.target.value }))} /></div>
             <div><Label>Email</Label><Input type="email" value={newStaff.email} onChange={(e) => setNewStaff((p) => ({ ...p, email: e.target.value }))} /></div>
             <div><Label>Phone</Label><Input value={newStaff.phone} onChange={(e) => setNewStaff((p) => ({ ...p, phone: e.target.value }))} /></div>
+            <div><Label>Password</Label><Input type="password" value={newStaff.password} onChange={(e) => setNewStaff((p) => ({ ...p, password: e.target.value }))} placeholder="Min. 6 characters" minLength={6} /></div>
           </div>
 
           <Button
             className="mt-5"
-            onClick={() => {
-              if (!newStaff.name || !newStaff.email) return;
-              settingsService.addStaff(newStaff.name, newStaff.email, newStaff.phone, user!.name);
-              setNewStaff({ name: "", email: "", phone: "" });
-              setCreated(true);
+            disabled={creating}
+            onClick={async () => {
+              if (!newStaff.name || !newStaff.email || !newStaff.password) return;
+              setCreating(true);
+              setCreateError("");
+              setCreated(false);
+              try {
+                await authService.createStaffAccount(newStaff.name, newStaff.email, newStaff.phone, "staff", newStaff.password);
+                setNewStaff({ name: "", email: "", phone: "", password: "" });
+                setCreated(true);
+              } catch (err: any) {
+                setCreateError(err.message || "Failed to create account.");
+              } finally {
+                setCreating(false);
+              }
             }}
           >
-            Add Staff Member
+            {creating ? "Creating..." : "Add Staff Member"}
           </Button>
-          {created && <p className="mt-3 text-sm text-emerald-400">✓ Staff account added and permission defaults assigned.</p>}
+          {created && <p className="mt-3 text-sm text-emerald-400">✓ Staff account created. They can log in at /admin-login.</p>}
+          {createError && <p className="mt-3 text-sm text-red-400">{createError}</p>}
         </Card>
       </div>
     </div>

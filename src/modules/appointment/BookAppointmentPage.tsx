@@ -1,5 +1,5 @@
 /**
- * Multi-step appointment booking flow (5 steps).
+ * Multi-step appointment booking flow (4 steps).
  * Available to authenticated patients.
  */
 
@@ -9,13 +9,13 @@ import { Badge, Button, Input, Label } from "../../components/ui";
 import { appointmentsService } from "../../services/appointments";
 import { calendarService } from "../../services/calendar";
 import { useStore } from "../../store/store";
-import { BOOKING, CLINIC, ROUTES } from "../../shared/constants";
+import { BOOKING, ROUTES } from "../../shared/constants";
 import { dashboardPathFor } from "../../shared/helpers";
 
 const TIME_SLOTS = BOOKING.TIME_SLOTS;
 
 export function BookAppointmentPage({ navigate }: { navigate: (p: string) => void }) {
-  const { user, services, appointments, settings } = useStore();
+  const { user, services, appointments } = useStore();
   const [step, setStep] = useState(1);
   const [serviceId, setServiceId] = useState(services[0].id);
   const [doctor] = useState("Dr. Estandarte");
@@ -24,8 +24,6 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
     return d.toISOString().slice(0, 10);
   });
   const [time, setTime] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState<"gcash" | "cash">("cash");
-  const [gcashRef, setGcashRef] = useState("");
   const [emergency, setEmergency] = useState(false);
   const [confirmed, setConfirmed] = useState<string | null>(null);
   const [bookingError, setBookingError] = useState("");
@@ -52,7 +50,7 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
     .filter((a) => a.date === date && a.status !== "cancelled")
     .map((a) => a.time);
 
-  function next() { setStep((s) => Math.min(s + 1, 5)); }
+  function next() { setStep((s) => Math.min(s + 1, 4)); }
   function back() { setStep((s) => Math.max(s - 1, 1)); }
 
   async function confirm() {
@@ -73,9 +71,8 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
         price: service.price,
         doctor, date, time,
         status: "pending",
-        paymentMethod,
-        paymentStatus: paymentMethod === "gcash" ? "pending_verification" : "unpaid",
-        gcashRef: paymentMethod === "gcash" ? gcashRef : undefined,
+        paymentMethod: "cash" as const,
+        paymentStatus: "unpaid" as const,
         emergency,
       });
       setConfirmed(ap.id);
@@ -99,7 +96,7 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
             <span className="text-gold-300 font-medium">{time}</span> has been received.
           </p>
           <p className="text-sm text-gold-100/55 mt-3">
-            {paymentMethod === "gcash" ? "Our staff will verify your GCash payment shortly." : "Please pay at the clinic on the day of your visit."}
+            {"Please arrive 10 minutes before your scheduled appointment."}
           </p>
           <div className="mt-8 flex justify-center gap-3">
             <Button onClick={() => navigate(dashboardPathFor(user.role))}>Go to Dashboard</Button>
@@ -123,15 +120,15 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
 
       <div className="relative max-w-4xl mx-auto px-6 py-12">
         <div className="text-center mb-10">
-          <p className="text-[10px] uppercase tracking-[0.4em] text-gold-400 font-semibold mb-3">Step {step} of 5</p>
+          <p className="text-[10px] uppercase tracking-[0.4em] text-gold-400 font-semibold mb-3">Step {step} of 4</p>
           <h1 className="font-serif text-4xl md:text-5xl text-gold-shine font-light">
             Book Your <span className="font-script italic">Appointment</span>
           </h1>
         </div>
 
         {/* Stepper */}
-        <div className="mb-10 flex items-center justify-between max-w-2xl mx-auto">
-          {["Service", "Doctor", "Schedule", "Payment", "Confirm"].map((label, i) => {
+        <div className="mb-10 flex items-center justify-between max-w-xl mx-auto">
+          {["Service", "Doctor", "Schedule", "Confirm"].map((label, i) => {
             const active = step >= i + 1;
             const current = step === i + 1;
             return (
@@ -144,7 +141,7 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
                   {step > i + 1 ? "✓" : i + 1}
                 </div>
                 <div className={`ml-2 text-[10px] uppercase tracking-wider hidden sm:block font-semibold ${active ? "text-gold-200" : "text-gold-100/30"}`}>{label}</div>
-                {i < 4 && <div className={`flex-1 h-px mx-3 transition-all ${step > i + 1 ? "bg-gold-400" : "bg-gold-500/15"}`} />}
+                {i < 3 && <div className={`flex-1 h-px mx-3 transition-all ${step > i + 1 ? "bg-gold-400" : "bg-gold-500/15"}`} />}
               </div>
             );
           })}
@@ -215,46 +212,7 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
             </div>
           )}
 
-          {step === 4 && (
-            <div>
-              <h3 className="font-serif text-2xl text-gold-shine mb-1">Payment Method</h3>
-              <p className="text-sm text-gold-100/50 mb-6">Choose how you'd like to settle your appointment.</p>
-              <div className="grid sm:grid-cols-2 gap-3">
-                <button onClick={() => setPaymentMethod("cash")} className={`p-5 rounded-xl border text-left transition ${paymentMethod === "cash" ? "border-gold-400 bg-gold-500/10" : "border-gold-500/20 hover:border-gold-400/50"}`}>
-                  <div className="text-2xl mb-2">💵</div>
-                  <div className="font-semibold text-gold-100">Cash on Visit</div>
-                  <div className="text-sm text-gold-100/60 mt-1">Pay directly at the clinic.</div>
-                </button>
-                <button onClick={() => setPaymentMethod("gcash")} className={`p-5 rounded-xl border text-left transition ${paymentMethod === "gcash" ? "border-gold-400 bg-gold-500/10" : "border-gold-500/20 hover:border-gold-400/50"}`}>
-                  <div className="text-2xl mb-2">📱</div>
-                  <div className="font-semibold text-gold-100">GCash (Reference)</div>
-                  <div className="text-sm text-gold-100/60 mt-1">Send payment & enter reference number.</div>
-                </button>
-              </div>
-              {paymentMethod === "gcash" && (
-                <div className="mt-5 p-5 rounded-xl border border-gold-500/30 bg-ink-800/60">
-                  <div className="flex items-start justify-between gap-4 flex-wrap">
-                    <div>
-                      <Label>Send payment to</Label>
-                      <div className="font-mono text-gold-300 text-lg">{settings.gcashNumber}</div>
-                      <div className="text-xs text-gold-100/60">{CLINIC.name}</div>
-                    </div>
-                    <div className="text-right">
-                      <Label>Amount</Label>
-                      <div className="font-mono text-gold-gradient text-2xl">₱{service.price.toLocaleString()}</div>
-                    </div>
-                  </div>
-                  <div className="mt-4">
-                    <Label>GCash Reference Number *</Label>
-                    <Input value={gcashRef} onChange={(e) => setGcashRef(e.target.value)} placeholder="13-digit reference number" required />
-                  </div>
-                  <p className="text-xs text-gold-100/50 mt-3">Your payment will be marked as <span className="text-yellow-300">Pending Verification</span> until staff confirms it.</p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {step === 5 && (
+            {step === 4 && (
             <div>
               <h3 className="font-serif text-2xl text-gold-shine mb-1">Review & Confirm</h3>
               <p className="text-sm text-gold-100/50 mb-6">Please review your appointment details before confirming.</p>
@@ -263,21 +221,18 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
                 <Row label="Service" value={service.name} />
                 <Row label="Doctor" value={doctor} />
                 <Row label="Date & Time" value={`${date} · ${time || "—"}`} />
-                <Row label="Payment Method" value={paymentMethod === "gcash" ? "GCash" : "Cash"} />
-                {paymentMethod === "gcash" && <Row label="GCash Reference" value={gcashRef || "—"} />}
                 {emergency && <Row label="Priority" value={<Badge tone="emergency">EMERGENCY</Badge>} />}
-                <div className="border-t border-gold-500/20 pt-3 flex items-center justify-between">
-                  <span className="text-gold-100/60">Total (locked at booking)</span>
-                  <span className="font-mono text-2xl text-gold-gradient">₱{service.price.toLocaleString()}</span>
-                </div>
               </div>
+              <p className="mt-5 text-xs text-gold-100/50">
+                Payment will be handled at the clinic on the day of your appointment.
+              </p>
             </div>
           )}
 
           <div className="mt-8 pt-6 border-t border-gold-500/15 flex justify-between gap-3">
             <Button variant="ghost" onClick={back} disabled={step === 1}>← Back</Button>
-            {step < 5 ? (
-              <Button onClick={next} disabled={(step === 3 && !time) || (step === 4 && paymentMethod === "gcash" && !gcashRef)}>Continue →</Button>
+            {step < 4 ? (
+              <Button onClick={next} disabled={step === 3 && !time}>Continue →</Button>
             ) : (
               <Button onClick={confirm} disabled={!time}>Confirm Appointment ✓</Button>
             )}

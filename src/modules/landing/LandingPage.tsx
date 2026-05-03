@@ -8,6 +8,7 @@ import { Logo, LogoMark } from "../../components/Logo";
 import { Button, Card, Section, Ornament } from "../../components/ui";
 import { useStore } from "../../store/store";
 import { CLINIC, ROUTES } from "../../shared/constants";
+import { dashboardPathFor } from "../../shared/helpers";
 
 const navLinks = [
   { l: "Home", h: "#home" },
@@ -18,7 +19,7 @@ const navLinks = [
 ];
 
 export function LandingPage({ navigate }: { navigate: (p: string) => void }) {
-  const { services } = useStore();
+  const { services, user, feedbacks } = useStore();
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenu, setMobileMenu] = useState(false);
   const [showAllServices, setShowAllServices] = useState(false);
@@ -39,7 +40,7 @@ export function LandingPage({ navigate }: { navigate: (p: string) => void }) {
   }, []);
 
   return (
-    <div className="min-h-screen bg-ink-950 text-gold-50 relative overflow-x-hidden">
+    <div className="min-h-screen bg-ink-950 text-gold-50 relative">
       <div className="fixed top-0 right-0 w-[600px] h-[600px] bg-gold-600/10 rounded-full blur-[120px] pointer-events-none" />
       <div className="fixed bottom-0 left-0 w-[500px] h-[500px] bg-gold-500/8 rounded-full blur-[100px] pointer-events-none" />
 
@@ -58,8 +59,19 @@ export function LandingPage({ navigate }: { navigate: (p: string) => void }) {
             ))}
           </nav>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => navigate(ROUTES.login)}>Login</Button>
-            <Button size="sm" onClick={() => navigate(ROUTES.book)} className="hidden sm:inline-flex">Book Now</Button>
+            {user ? (
+              <>
+                <Button variant="outline" size="sm" onClick={() => navigate(dashboardPathFor(user.role))}>
+                  My Dashboard
+                </Button>
+                <Button size="sm" onClick={() => navigate(ROUTES.book)} className="hidden sm:inline-flex">Book Now</Button>
+              </>
+            ) : (
+              <>
+                <Button variant="outline" size="sm" onClick={() => navigate(ROUTES.login)}>Login</Button>
+                <Button size="sm" onClick={() => navigate(ROUTES.book)} className="hidden sm:inline-flex">Book Now</Button>
+              </>
+            )}
             <button
               onClick={() => setMobileMenu(!mobileMenu)}
               className="lg:hidden inline-flex items-center justify-center rounded-full border border-gold-500/25 bg-ink-900/70 text-gold-200 p-2.5 shadow-luxe"
@@ -121,9 +133,9 @@ export function LandingPage({ navigate }: { navigate: (p: string) => void }) {
                   <path d="M5 12h14M13 5l7 7-7 7" />
                 </svg>
               </Button>
-              <Button size="lg" variant="outline" onClick={() => { window.location.href = `tel:${CLINIC.phone.replace(/\s/g, "")}`; }}>
-                Call Us
-              </Button>
+              <a href={`tel:+63${CLINIC.phone.replace(/\D/g, "").slice(1)}`}>
+                <Button size="lg" variant="outline">Call Us</Button>
+              </a>
             </div>
           </div>
 
@@ -320,6 +332,9 @@ export function LandingPage({ navigate }: { navigate: (p: string) => void }) {
         </div>
       </section>
 
+      {/* TESTIMONIALS — live from patient feedback */}
+      <TestimonialsSection />
+
       {/* CONTACT */}
       <Section id="contact" eyebrow="Get In Touch" title={<>Visit our <span className="font-script italic">sanctuary.</span></>} subtitle="We'd love to welcome you. Reach out anytime through the channels below.">
         <div className="grid md:grid-cols-3 gap-5 stagger mb-10">
@@ -329,7 +344,7 @@ export function LandingPage({ navigate }: { navigate: (p: string) => void }) {
         </div>
         <div className="text-center">
           <a href={CLINIC.facebookUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-3 px-6 py-3 rounded-full glass hover:border-gold-400/50 transition group">
-            <span className="text-[10px] uppercase tracking-[0.3em] text-gold-300/70">Facebook</span>
+            <span className="text-[10px] uppercase tracking-[0.3em] text-gold-300/70"></span>
             <span className="text-sm text-gold-100 group-hover:text-gold-300 transition">Follow our official Facebook page</span>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gold-400 group-hover:translate-x-1 transition">
               <path d="M5 12h14M13 5l7 7-7 7" />
@@ -399,6 +414,31 @@ export function LandingPage({ navigate }: { navigate: (p: string) => void }) {
         </div>
       </footer>
     </div>
+  );
+}
+
+function TestimonialsSection() {
+  const { feedbacks } = useStore();
+  // Show up to 6 most recent feedbacks with 4+ stars
+  const shown = [...feedbacks]
+    .filter((f) => f.stars >= 4)
+    .sort((a, b) => b.at.localeCompare(a.at))
+    .slice(0, 6);
+
+  if (shown.length === 0) return null;
+
+  return (
+    <Section id="testimonials" eyebrow="Patient Reviews" title={<>What our patients <span className="font-script italic">say.</span></>}>
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 stagger">
+        {shown.map((f) => (
+          <div key={f.id} className="glass rounded-xl p-6 flex flex-col gap-3">
+            <div className="text-gold-400 text-lg">{"★".repeat(f.stars)}<span className="text-gold-100/20">{"★".repeat(5 - f.stars)}</span></div>
+            <p className="text-sm text-gold-100/70 leading-relaxed flex-1">"{f.text}"</p>
+            <div className="text-xs text-gold-300/60 font-medium">{f.userName}</div>
+          </div>
+        ))}
+      </div>
+    </Section>
   );
 }
 

@@ -3,7 +3,7 @@
  * Used across modules, services and components.
  */
 
-export type Role = "doctor" | "staff" | "patient";
+export type Role = "admin" | "doctor" | "staff" | "patient";
 
 export interface User {
   id: string;

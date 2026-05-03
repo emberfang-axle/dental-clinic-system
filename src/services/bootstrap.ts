@@ -1,61 +1,71 @@
 import { onAuthStateChanged } from "firebase/auth";
 import type { ClinicSettings, StaffPermission, User, Appointment, NotificationEntry, FeedbackEntry, Service, AuditLog } from "../shared/types";
 import { auth } from "./firebase";
-import { listenCollection, listenDoc, qOrderBy, qWhere } from "./firestore";
+import { listenCollection, listenDoc, listCollection, setDocTyped, qOrderBy, qWhere } from "./firestore";
 import { resetState, setState } from "../store/store";
 
-/**
- * Bootstraps real-time Firestore listeners and pushes data into the app store.
- * Call once on app startup (e.g. in `main.tsx`).
- */
+const DEFAULT_SERVICES: Omit<Service, "id">[] = [
+  { name: "Tooth Extraction",         price: 800,   duration: 45, description: "Safe and gentle removal of damaged or decayed teeth." },
+  { name: "Tooth Filling",            price: 600,   duration: 30, description: "Restore cavities with tooth-colored composite fillings." },
+  { name: "Oral Prophylaxis (Cleaning)", price: 700, duration: 45, description: "Professional cleaning to remove plaque and tartar buildup." },
+  { name: "Teeth Whitening",          price: 3500,  duration: 60, description: "Brighten your smile with safe in-clinic whitening." },
+  { name: "Braces",                   price: 25000, duration: 90, description: "Orthodontic treatment for properly aligned teeth." },
+  { name: "Dentures",                 price: 8000,  duration: 60, description: "Comfortable, custom-fitted full or partial dentures." },
+  { name: "Root Canal Treatment",     price: 6500,  duration: 90, description: "Save infected teeth with modern endodontic care." },
+  { name: "Crowns and Bridges",       price: 9000,  duration: 75, description: "Restore strength and appearance with quality crowns." },
+  { name: "Veneers",                  price: 12000, duration: 90, description: "Cosmetic shells for a perfect, natural-looking smile." },
+  { name: "Odontectomy",              price: 5500,  duration: 90, description: "Surgical removal of impacted wisdom teeth." },
+];
+
+async function seedServices() {
+  const existing = await listCollection<Service>("services");
+  if (existing.length > 0) return;
+  for (const s of DEFAULT_SERVICES) {
+    const id = `svc_${Math.random().toString(16).slice(2)}_${Date.now().toString(16)}`;
+    await setDocTyped("services", id, { ...s, id } as any);
+  }
+}
+
+// Sort helpers — avoids composite indexes by sorting in JS
+const byName = (a: User, b: User) => a.name.localeCompare(b.name);
+const byDateDesc = (a: Appointment, b: Appointment) => (b.date + b.time).localeCompare(a.date + a.time);
+const byAtDesc = <T extends { at: string }>(a: T, b: T) => b.at.localeCompare(a.at);
+
 export function bootstrapRealtime() {
-  let unsubUserProfile: (() => void) | null = null;
-  let unsubs: Array<() => void> = [];
+  let unsubProfile: (() => void) | null = null;
+  let unsubs: (() => void)[] = [];
 
   const stopAll = () => {
-    if (unsubUserProfile) {
-      unsubUserProfile();
-      unsubUserProfile = null;
-    }
+    unsubProfile?.();
+    unsubProfile = null;
     unsubs.forEach((u) => u());
     unsubs = [];
   };
 
-  // Public/global collections
+  seedServices();
+
+  // Public: feedbacks for landing page (no auth needed, no where clause = no composite index)
   unsubs.push(
-    listenCollection<Service>("services", (services) => setState({ services }), [qOrderBy("name", "asc")] as any)
+    listenCollection<FeedbackEntry>("feedbacks", (f) => setState({ feedbacks: [...f].sort(byAtDesc) }))
   );
 
-  // Clinic settings doc (single doc)
-  unsubs.push(
-    listenDoc<any>("settings", "clinic", (doc) => {
-      if (!doc) return;
-      const settings = doc as any as ClinicSettings;
-      const staffPermissions = (doc as any).staffPermissions as StaffPermission[] | undefined;
-      setState({
-        settings,
-        staffPermissions: staffPermissions || [],
-      });
-    })
-  );
-
-  // Auth-scoped data
   const unsubAuth = onAuthStateChanged(auth, (firebaseUser) => {
     stopAll();
     resetState();
 
-    // Reattach global listeners after reset
+    // Re-attach public feedbacks after reset
     unsubs.push(
-      listenCollection<Service>("services", (services) => setState({ services }), [qOrderBy("name", "asc")] as any)
+      listenCollection<FeedbackEntry>("feedbacks", (f) => setState({ feedbacks: [...f].sort(byAtDesc) }))
     );
+
+    // Settings
     unsubs.push(
+      listenCollection<Service>("services", (s) => setState({ services: [...s].sort(byName as any) })),
       listenDoc<any>("settings", "clinic", (doc) => {
         if (!doc) return;
-        const settings = doc as any as ClinicSettings;
-        const staffPermissions = (doc as any).staffPermissions as StaffPermission[] | undefined;
         setState({
-          settings,
-          staffPermissions: staffPermissions || [],
+          settings: doc as any as ClinicSettings,
+          staffPermissions: (doc.staffPermissions as StaffPermission[]) || [],
         });
       })
     );
@@ -65,63 +75,54 @@ export function bootstrapRealtime() {
       return;
     }
 
-    // Current user profile
-    unsubUserProfile = listenDoc<User>("users", firebaseUser.uid, (profile) => {
+    // Profile
+    unsubProfile = listenDoc<User>("users", firebaseUser.uid, (profile) => {
       setState({ user: profile as any });
+      attachRoleListeners(profile?.role ?? null);
     });
 
-    // Users list (doctor/staff only). If you want strict security, enforce via rules.
-    unsubs.push(
-      listenCollection<User>("users", (users) => setState({ users }), [qOrderBy("name", "asc")] as any)
-    );
-
-    // Appointments: patients see only theirs; staff/doctor see all.
-    // We don't know role until profile arrives, so start conservative and upgrade.
-    const startAppointments = (role: User["role"] | null) => {
-      // clear old appointment listeners
-      unsubs = unsubs.filter(Boolean);
-      const base = [qOrderBy("date", "desc"), qOrderBy("time", "desc")] as any[];
-      if (role === "patient") {
-        unsubs.push(
-          listenCollection<Appointment>(
-            "appointments",
-            (appointments) => setState({ appointments }),
-            [qWhere("patientId", "==", firebaseUser.uid), ...base] as any
-          )
-        );
-      } else {
-        unsubs.push(
-          listenCollection<Appointment>("appointments", (appointments) => setState({ appointments }), base)
-        );
-      }
-    };
-
-    // Notifications: filtered by userId always
+    // Notifications — where only, no orderBy → no composite index needed
     unsubs.push(
       listenCollection<NotificationEntry>(
         "notifications",
-        (notifications) => setState({ notifications }),
-        [qWhere("userId", "==", firebaseUser.uid), qOrderBy("at", "desc")] as any
+        (n) => setState({ notifications: [...n].sort(byAtDesc) }),
+        [qWhere("userId", "==", firebaseUser.uid)] as any
       )
     );
 
-    // Feedback: patients only theirs, staff/doctor all (simple)
+    // Logs — orderBy only, no where → single-field index (auto-created)
     unsubs.push(
-      listenCollection<FeedbackEntry>(
-        "feedbacks",
-        (feedbacks) => setState({ feedbacks }),
-        [qWhere("userId", "==", firebaseUser.uid), qOrderBy("at", "desc")] as any
-      )
+      listenCollection<AuditLog>("logs", (logs) => setState({ logs: [...logs].sort(byAtDesc) }))
     );
 
-    // Logs (doctor only ideally). Here we keep recent logs for everyone who can read via rules.
-    unsubs.push(listenCollection<AuditLog>("logs", (logs) => setState({ logs }), [qOrderBy("at", "desc")] as any));
+    let appointmentUnsub: (() => void) | null = null;
+    let usersUnsub: (() => void) | null = null;
 
-    // When user profile arrives, adjust appointment listener.
-    const unsubRoleWatcher = listenDoc<User>("users", firebaseUser.uid, (profile) => {
-      startAppointments(profile?.role ?? null);
-    });
-    unsubs.push(unsubRoleWatcher);
+    function attachRoleListeners(role: User["role"] | null) {
+      appointmentUnsub?.();
+      usersUnsub?.();
+
+      if (role === "patient") {
+        // where only, sort in JS
+        appointmentUnsub = listenCollection<Appointment>(
+          "appointments",
+          (a) => setState({ appointments: [...a].sort(byDateDesc) }),
+          [qWhere("patientId", "==", firebaseUser.uid)] as any
+        );
+      } else if (role) {
+        // no where, orderBy only → single-field index
+        appointmentUnsub = listenCollection<Appointment>(
+          "appointments",
+          (a) => setState({ appointments: [...a].sort(byDateDesc) }),
+          [qOrderBy("date", "desc")] as any
+        );
+        usersUnsub = listenCollection<User>(
+          "users",
+          (u) => setState({ users: [...u].sort(byName) }),
+          [qOrderBy("name", "asc")] as any
+        );
+      }
+    }
   });
 
   return () => {
@@ -129,4 +130,3 @@ export function bootstrapRealtime() {
     stopAll();
   };
 }
-
