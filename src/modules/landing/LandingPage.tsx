@@ -23,7 +23,7 @@ export function LandingPage({ navigate }: { navigate: (p: string) => void }) {
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenu, setMobileMenu] = useState(false);
   const [showAllServices, setShowAllServices] = useState(false);
-  const servicesPreviewCount = 6;
+  const servicesPreviewCount = 3;
   const displayedServices = showAllServices ? services : services.slice(0, servicesPreviewCount);
 
   useEffect(() => {

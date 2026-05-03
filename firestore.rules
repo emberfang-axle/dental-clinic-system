@@ -81,6 +81,12 @@ service cloud.firestore {
         && (resource.data.userId == request.auth.uid || isAdminOrDoctor());
     }
 
+    // ── ANNOUNCEMENTS ─────────────────────────────────────
+    match /announcements/{id} {
+      allow read: if true;
+      allow create, update, delete: if request.auth != null;
+    }
+
     // ── FEEDBACK ──────────────────────────────────────────
     match /feedbacks/{feedbackId} {
       allow read: if true;  // public — shown on landing page

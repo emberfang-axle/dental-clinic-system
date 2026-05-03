@@ -73,6 +73,16 @@ export interface AuditLog {
   at: string;
 }
 
+export interface Announcement {
+  id: string;
+  title: string;
+  body: string;
+  author: string;
+  authorRole: Role;
+  at: string;
+  pinned?: boolean;
+}
+
 export type NotificationKind = "appointment" | "payment" | "reminder" | "system";
 
 export interface NotificationEntry {

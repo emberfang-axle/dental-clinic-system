@@ -292,95 +292,157 @@ export function ProfilePage() {
 /* ─────────── REPORTS PAGE — Doctor only ─────────── */
 
 export function ReportsPage() {
-  const { appointments, services, feedbacks } = useStore() as {
+  const { appointments, services, feedbacks, users } = useStore() as {
     appointments: Appointment[];
     services: Service[];
     feedbacks: FeedbackEntry[];
+    users: any[];
   };
 
-  const revenue = appointments
-    .filter((a) => a.paymentStatus === "paid")
+  const paid = appointments.filter((a) => a.paymentStatus === "paid");
+  const completed = appointments.filter((a) => a.status === "completed");
+  const pending = appointments.filter((a) => a.status === "pending");
+  const cancelled = appointments.filter((a) => a.status === "cancelled");
+  const revenue = paid.reduce((sum, a) => sum + a.price, 0);
+  const pendingRevenue = appointments
+    .filter((a) => a.status !== "cancelled" && a.paymentStatus !== "paid")
     .reduce((sum, a) => sum + a.price, 0);
 
+  const avgRating = feedbacks.length
+    ? (feedbacks.reduce((s, f) => s + f.stars, 0) / feedbacks.length).toFixed(1)
+    : "—";
+
+  const completionRate = appointments.length
+    ? Math.round((completed.length / appointments.length) * 100)
+    : 0;
+
+  // Revenue by service
   const byService = services
-    .map((s) => ({ 
-      name: s.name, 
-      count: appointments.filter((a) => a.serviceId === s.id).length 
+    .map((s) => ({
+      name: s.name,
+      count: appointments.filter((a) => a.serviceId === s.id).length,
+      revenue: paid.filter((a) => a.serviceId === s.id).reduce((sum, a) => sum + a.price, 0),
     }))
+    .filter((s) => s.count > 0)
     .sort((a, b) => b.count - a.count);
+  const maxCount = Math.max(1, ...byService.map((b) => b.count));
 
-  const max = Math.max(1, ...byService.map((b) => b.count));
-  
-  const byStatus = (["pending", "confirmed", "completed", "cancelled"] as AppointmentStatus[]).map((st) => ({
-    st,
-    n: appointments.filter((a) => a.status === st).length,
-  }));
+  // Monthly revenue (last 6 months)
+  const now = new Date();
+  const months = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
+    const key = d.toISOString().slice(0, 7);
+    const label = d.toLocaleString("default", { month: "short" });
+    const rev = paid
+      .filter((a) => a.date.startsWith(key))
+      .reduce((sum, a) => sum + a.price, 0);
+    return { label, rev };
+  });
+  const maxRev = Math.max(1, ...months.map((m) => m.rev));
 
-  const averageRating = feedbacks.length
-    ? (feedbacks.reduce((sum, f) => sum + f.stars, 0) / feedbacks.length).toFixed(1)
-    : "0.0";
+  // Payment method split
+  const gcashCount = paid.filter((a) => a.paymentMethod === "gcash").length;
+  const cashCount = paid.filter((a) => a.paymentMethod === "cash").length;
+
+  // Top patients
+  const patientMap: Record<string, { name: string; count: number; spent: number }> = {};
+  appointments.forEach((a) => {
+    if (!patientMap[a.patientId]) patientMap[a.patientId] = { name: a.patientName, count: 0, spent: 0 };
+    patientMap[a.patientId].count++;
+    if (a.paymentStatus === "paid") patientMap[a.patientId].spent += a.price;
+  });
+  const topPatients = Object.values(patientMap).sort((a, b) => b.count - a.count).slice(0, 5);
 
   return (
     <div className="space-y-6">
+      {/* KPI row */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-        <StatCard icon="💰" label="Total Revenue" value={`₱${revenue.toLocaleString()}`} />
-        <StatCard icon="📅" label="Total Appointments" value={appointments.length.toString()} />
-        <StatCard 
-          icon="✅" 
-          label="Completed" 
-          value={appointments.filter((a) => a.status === "completed").length.toString()} 
-        />
-        <StatCard icon="⭐" label="Average Rating" value={averageRating} />
+        <StatCard icon="💰" label="Total Revenue" value={`₱${revenue.toLocaleString()}`} sub={`₱${pendingRevenue.toLocaleString()} pending`} />
+        <StatCard icon="📋" label="Total Appointments" value={appointments.length.toString()} sub={`${pending.length} pending confirmation`} />
+        <StatCard icon="✅" label="Completion Rate" value={`${completionRate}%`} sub={`${completed.length} completed · ${cancelled.length} cancelled`} />
+        <StatCard icon="⭐" label="Avg Rating" value={avgRating} sub={`${feedbacks.length} review${feedbacks.length !== 1 ? "s" : ""}`} />
       </div>
 
+      {/* Monthly revenue chart */}
       <Card>
-        <h3 className="font-serif text-xl text-gold-gradient mb-4">Bookings by Service</h3>
-        <div className="space-y-3">
-          {byService.map((b) => (
-            <div key={b.name}>
-              <div className="flex items-center justify-between text-sm mb-1">
-                <span className="text-gold-100/80">{b.name}</span>
-                <span className="text-gold-300 font-mono">{b.count}</span>
-              </div>
-              <div className="h-2 bg-ink-700 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-gold-gradient" 
-                  style={{ width: `${(b.count / max) * 100}%` }} 
-                />
-              </div>
+        <h3 className="font-serif text-xl text-gold-gradient mb-5">Monthly Revenue (Last 6 Months)</h3>
+        <div className="flex items-end gap-3 h-32">
+          {months.map((m) => (
+            <div key={m.label} className="flex-1 flex flex-col items-center gap-1">
+              <span className="text-[10px] text-gold-300/60 font-mono">
+                {m.rev > 0 ? `₱${(m.rev / 1000).toFixed(0)}k` : ""}
+              </span>
+              <div className="w-full rounded-t-md bg-gold-gradient/80 transition-all" style={{ height: `${(m.rev / maxRev) * 96}px`, minHeight: m.rev > 0 ? "4px" : "0" }} />
+              <span className="text-[10px] text-gold-100/50">{m.label}</span>
             </div>
           ))}
         </div>
       </Card>
 
-      <div className="grid xl:grid-cols-[0.7fr_1.3fr] gap-6">
+      <div className="grid xl:grid-cols-2 gap-6">
+        {/* Bookings by service */}
         <Card>
-          <h3 className="font-serif text-xl text-gold-gradient mb-4">Appointment Status</h3>
-          <div className="grid grid-cols-2 gap-3">
-            {byStatus.map((s) => (
-              <div key={s.st} className="p-4 rounded-xl border border-gold-500/20 text-center">
-                <Badge tone={s.st}>{s.st}</Badge>
-                <div className="text-2xl font-serif text-gold-gradient mt-2">{s.n}</div>
+          <h3 className="font-serif text-xl text-gold-gradient mb-4">Bookings by Service</h3>
+          {byService.length === 0 && <p className="text-sm text-gold-100/50">No bookings yet.</p>}
+          <div className="space-y-3">
+            {byService.map((b) => (
+              <div key={b.name}>
+                <div className="flex items-center justify-between text-sm mb-1">
+                  <span className="text-gold-100/80 truncate max-w-[60%]">{b.name}</span>
+                  <span className="text-gold-300 font-mono text-xs">{b.count} · ₱{b.revenue.toLocaleString()}</span>
+                </div>
+                <div className="h-2 bg-ink-700 rounded-full overflow-hidden">
+                  <div className="h-full bg-gold-gradient" style={{ width: `${(b.count / maxCount) * 100}%` }} />
+                </div>
               </div>
             ))}
           </div>
         </Card>
 
+        {/* Payment breakdown */}
         <Card>
-          <h3 className="font-serif text-xl text-gold-gradient mb-4">Recent Patient Feedback</h3>
-          <div className="space-y-3">
-            {feedbacks.slice(0, 5).map((entry) => (
-              <div key={entry.id} className="rounded-xl border border-gold-500/15 bg-ink-900/55 p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="font-medium text-gold-100">{entry.userName}</div>
-                  <div className="text-gold-400">{"★".repeat(entry.stars)}</div>
-                </div>
-                <p className="mt-2 text-sm text-gold-100/65">{entry.text}</p>
+          <h3 className="font-serif text-xl text-gold-gradient mb-4">Payment Breakdown</h3>
+          <div className="grid grid-cols-2 gap-3 mb-5">
+            <div className="p-4 rounded-xl border border-gold-500/20 text-center">
+              <div className="text-xs uppercase tracking-wider text-gold-300/60 mb-1">GCash</div>
+              <div className="text-2xl font-serif text-gold-gradient">{gcashCount}</div>
+              <div className="text-xs text-gold-100/50 mt-1">transactions</div>
+            </div>
+            <div className="p-4 rounded-xl border border-gold-500/20 text-center">
+              <div className="text-xs uppercase tracking-wider text-gold-300/60 mb-1">Cash</div>
+              <div className="text-2xl font-serif text-gold-gradient">{cashCount}</div>
+              <div className="text-xs text-gold-100/50 mt-1">transactions</div>
+            </div>
+          </div>
+          <h4 className="text-sm font-medium text-gold-100/70 mb-3">Top Patients</h4>
+          <div className="space-y-2">
+            {topPatients.map((p, i) => (
+              <div key={p.name} className="flex items-center justify-between text-sm">
+                <span className="text-gold-100/70"><span className="text-gold-400 font-mono mr-2">#{i + 1}</span>{p.name}</span>
+                <span className="text-gold-300 font-mono text-xs">{p.count} visits · ₱{p.spent.toLocaleString()}</span>
               </div>
             ))}
+            {topPatients.length === 0 && <p className="text-sm text-gold-100/50">No patient data yet.</p>}
           </div>
         </Card>
       </div>
+
+      {/* Recent feedback */}
+      <Card>
+        <h3 className="font-serif text-xl text-gold-gradient mb-4">Recent Patient Feedback</h3>
+        {feedbacks.length === 0 && <p className="text-sm text-gold-100/50">No feedback submitted yet.</p>}
+        <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">
+          {[...feedbacks].sort((a, b) => b.at.localeCompare(a.at)).slice(0, 6).map((f) => (
+            <div key={f.id} className="rounded-xl border border-gold-500/15 bg-ink-900/55 p-4">
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <span className="font-medium text-gold-100 text-sm truncate">{f.userName}</span>
+                <span className="text-gold-400 text-sm shrink-0">{"★".repeat(f.stars)}<span className="text-gold-100/20">{"★".repeat(5 - f.stars)}</span></span>
+              </div>
+              <p className="text-xs text-gold-100/60 leading-relaxed line-clamp-3">{f.text}</p>
+            </div>
+          ))}
+        </div>
+      </Card>
     </div>
   );
 }
@@ -389,39 +451,68 @@ export function ReportsPage() {
 
 export function AuditLogsPage() {
   const { logs } = useStore() as { logs: AuditLog[] };
-  
+  const [search, setSearch] = useState("");
+
+  const filtered = logs.filter((l) =>
+    !search || `${l.actor}${l.action}${l.target}`.toLowerCase().includes(search.toLowerCase())
+  );
+
   return (
-    <Card className="!p-0 overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm min-w-[760px]">
-          <thead className="bg-ink-800/60 text-xs uppercase tracking-wider text-gold-200/70 text-left">
-            <tr>
-              <th className="px-4 py-3">When</th>
-              <th className="px-4 py-3">Actor</th>
-              <th className="px-4 py-3">Action</th>
-              <th className="px-4 py-3">Target</th>
-            </tr>
-          </thead>
-          <tbody>
-            {logs.map((l) => (
-              <tr key={l.id} className="border-t border-gold-500/10">
-                <td className="px-4 py-3 text-xs text-gold-100/60">{formatDateTime(l.at)}</td>
-                <td className="px-4 py-3 text-gold-200">{l.actor}</td>
-                <td className="px-4 py-3 text-gold-100">{l.action}</td>
-                <td className="px-4 py-3 text-gold-100/70">{l.target}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+    <div className="space-y-4">
+      <div className="grid grid-cols-3 gap-4">
+        <Card className="!p-4 text-center">
+          <div className="text-2xl font-serif text-gold-gradient">{logs.length}</div>
+          <div className="text-[10px] uppercase tracking-wider text-gold-100/50 mt-1">Total Events</div>
+        </Card>
+        <Card className="!p-4 text-center">
+          <div className="text-2xl font-serif text-gold-gradient">
+            {new Set(logs.map((l) => l.actor)).size}
+          </div>
+          <div className="text-[10px] uppercase tracking-wider text-gold-100/50 mt-1">Unique Actors</div>
+        </Card>
+        <Card className="!p-4 text-center">
+          <div className="text-2xl font-serif text-gold-gradient">
+            {logs.filter((l) => l.at.startsWith(new Date().toISOString().slice(0, 10))).length}
+          </div>
+          <div className="text-[10px] uppercase tracking-wider text-gold-100/50 mt-1">Today</div>
+        </Card>
       </div>
-    </Card>
+
+      <Card className="!p-4">
+        <Input
+          placeholder="Search by actor, action, or target…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </Card>
+
+      <div className="space-y-2">
+        {filtered.length === 0 && (
+          <Card><p className="text-sm text-gold-100/50 text-center py-4">No audit logs found.</p></Card>
+        )}
+        {filtered.map((l) => (
+          <div key={l.id} className="glass rounded-xl px-4 py-3 flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm font-medium text-gold-100">{l.actor}</span>
+                <span className="text-xs text-gold-300/60">→</span>
+                <span className="text-sm text-gold-100/80">{l.action}</span>
+              </div>
+              <div className="text-xs text-gold-100/45 mt-0.5 truncate">{l.target}</div>
+            </div>
+            <div className="text-[10px] text-gold-100/40 shrink-0 mt-0.5">{formatDateTime(l.at)}</div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 /* ─────────── NOTIFICATIONS CENTER — Patient (reusable) ─────────── */
 
 export function NotificationsCenter() {
-  const { notifications, user } = useStore() as {
+  const { notifications, announcements, user } = useStore() as {
     notifications: NotificationEntry[];
+    announcements: any[];
     user: { id: string; name: string; role: Role } | null;
   };
 
@@ -496,6 +587,22 @@ export function NotificationsCenter() {
           </Card>
         )}
       </div>
+
+      {announcements.length > 0 && (
+        <div>
+          <h3 className="font-serif text-xl text-gold-gradient mb-3">Clinic Announcements</h3>
+          <div className="space-y-3">
+            {announcements.map((a: any) => (
+              <div key={a.id} className={`glass rounded-xl p-5 border ${a.pinned ? "border-gold-400/40" : "border-gold-500/15"}`}>
+                {a.pinned && <span className="text-[10px] uppercase tracking-wider text-gold-400 font-semibold">📌 Pinned · </span>}
+                <span className="font-semibold text-gold-100">{a.title}</span>
+                <p className="text-sm text-gold-100/65 mt-2 leading-relaxed">{a.body}</p>
+                <p className="text-[10px] text-gold-100/40 mt-2">{a.author} · {new Date(a.at).toLocaleString()}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

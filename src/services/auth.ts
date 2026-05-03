@@ -3,13 +3,13 @@ import {
   signInWithEmailAndPassword,
   signOut,
   updateProfile as updateFirebaseProfile,
-  GoogleAuthProvider,
-  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   getAuth,
 } from "firebase/auth";
 import { initializeApp, deleteApp } from "firebase/app";
 import type { Role, User } from "../shared/types";
-import { auth, app } from "./firebase";
+import { auth, app, googleProvider } from "./firebase";
 import { getDocTyped, setDocTyped, updateDocTyped } from "./firestore";
 import { getSnapshot, setState } from "../store/store";
 
@@ -55,29 +55,14 @@ export const authService = {
     return user;
   },
 
-  async googleSignIn(): Promise<User> {
-    const provider = new GoogleAuthProvider();
-    provider.setCustomParameters({ prompt: "select_account" });
-    try {
-      const res = await signInWithPopup(auth, provider);
-      return upsertGoogleUser(res.user);
-    } catch (err: any) {
-      if (err.code === "auth/popup-blocked") {
-        throw new Error("Popup blocked. Allow popups for this site in your browser and try again.");
-      }
-      if (err.code === "auth/popup-closed-by-user" || err.code === "auth/cancelled-popup-request") {
-        throw new Error("Sign-in cancelled.");
-      }
-      if (err.code === "auth/operation-not-allowed") {
-        throw new Error("Google sign-in is not enabled in Firebase Console. Enable it under Authentication → Sign-in method → Google.");
-      }
-      if (err.code === "auth/unauthorized-domain") {
-        throw new Error(`This domain is not authorized. Add it in Firebase Console → Authentication → Settings → Authorized domains.`);
-      }
-      // "auth/invalid-action-code" or internal errors usually mean the OAuth client
-      // in Google Cloud Console is missing localhost as an authorized JavaScript origin.
-      throw new Error(`Google sign-in failed (${err.code || "unknown"}). In Google Cloud Console → APIs & Services → Credentials → OAuth 2.0 Web Client → add http://localhost:5173 to Authorized JavaScript Origins.`);
-    }
+  async googleSignIn(): Promise<void> {
+    await signInWithRedirect(auth, googleProvider);
+  },
+
+  async handleRedirectResult(): Promise<User | null> {
+    const result = await getRedirectResult(auth);
+    if (!result) return null;
+    return upsertGoogleUser(result.user);
   },
 
   async logout() {
@@ -110,19 +95,24 @@ export const authService = {
     void actor;
     await updateDocTyped<User>("users", userId, partial as any);
 
-    // If name changed, sync it to all active appointments for this patient
+    const { appointments, user } = getSnapshot();
+
+    // Update the logged-in user in the store
+    if (user && user.id === userId) {
+      setState({ user: { ...user, ...partial } });
+    }
+
+    // If name changed, sync it to all appointments for this patient (except cancelled)
     if (partial.name) {
-      const { appointments } = getSnapshot();
-      const active = appointments.filter(
-        (a) => a.patientId === userId && a.status !== "cancelled" && a.status !== "completed"
+      const toSync = appointments.filter(
+        (a) => a.patientId === userId && a.status !== "cancelled"
       );
       await Promise.all(
-        active.map((a) => updateDocTyped("appointments", a.id, { patientName: partial.name } as any))
+        toSync.map((a) => updateDocTyped("appointments", a.id, { patientName: partial.name } as any))
       );
-      // Update local store too
       setState({
         appointments: appointments.map((a) =>
-          active.some((x) => x.id === a.id) ? { ...a, patientName: partial.name! } : a
+          toSync.some((x) => x.id === a.id) ? { ...a, patientName: partial.name! } : a
         ),
       });
     }

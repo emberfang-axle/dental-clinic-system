@@ -8,6 +8,7 @@ import type {
   Service,
   StaffPermission,
   User,
+  Announcement,
 } from "../shared/types";
 
 export interface AppState {
@@ -20,6 +21,7 @@ export interface AppState {
   feedbacks: FeedbackEntry[];
   settings: ClinicSettings;
   staffPermissions: StaffPermission[];
+  announcements: Announcement[];
 }
 
 let state: AppState = {
@@ -32,6 +34,7 @@ let state: AppState = {
   feedbacks: [],
   settings: {} as ClinicSettings,
   staffPermissions: [],
+  announcements: [],
 };
 
 type Listener = () => void;
@@ -62,6 +65,7 @@ export function resetState() {
     feedbacks: [],
     settings: {} as ClinicSettings,
     staffPermissions: [],
+    announcements: [],
   };
   listeners.forEach((l) => l());
 }

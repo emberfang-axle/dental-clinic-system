@@ -2,7 +2,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import type { ClinicSettings, StaffPermission, User, Appointment, NotificationEntry, FeedbackEntry, Service, AuditLog } from "../shared/types";
 import { auth } from "./firebase";
 import { listenCollection, listenDoc, listCollection, setDocTyped, qOrderBy, qWhere } from "./firestore";
-import { resetState, setState } from "../store/store";
+import { resetState, setState, getSnapshot } from "../store/store";
 
 const DEFAULT_SERVICES: Omit<Service, "id">[] = [
   { name: "Tooth Extraction",         price: 800,   duration: 45, description: "Safe and gentle removal of damaged or decayed teeth." },
@@ -44,23 +44,27 @@ export function bootstrapRealtime() {
 
   seedServices();
 
-  // Public: feedbacks for landing page (no auth needed, no where clause = no composite index)
-  unsubs.push(
-    listenCollection<FeedbackEntry>("feedbacks", (f) => setState({ feedbacks: [...f].sort(byAtDesc) }))
+  // Public listeners — always active, never torn down on auth change
+  const publicUnsubs: (() => void)[] = [];
+  publicUnsubs.push(
+    listenCollection<Service>("services", (s) => setState({ services: [...s].sort(byName as any) })),
+    listenCollection<FeedbackEntry>("feedbacks", (f) => setState({ feedbacks: [...f].sort(byAtDesc) })),
+    listenCollection<any>("announcements", (a) => setState({ announcements: [...a].sort((x: any, y: any) => {
+      if (x.pinned && !y.pinned) return -1;
+      if (!x.pinned && y.pinned) return 1;
+      return y.at.localeCompare(x.at);
+    }) }))
   );
 
   const unsubAuth = onAuthStateChanged(auth, (firebaseUser) => {
     stopAll();
+    // Preserve public data that's managed by always-on listeners
+    const { services, feedbacks, announcements } = getSnapshot();
     resetState();
-
-    // Re-attach public feedbacks after reset
-    unsubs.push(
-      listenCollection<FeedbackEntry>("feedbacks", (f) => setState({ feedbacks: [...f].sort(byAtDesc) }))
-    );
+    setState({ services, feedbacks, announcements });
 
     // Settings
     unsubs.push(
-      listenCollection<Service>("services", (s) => setState({ services: [...s].sort(byName as any) })),
       listenDoc<any>("settings", "clinic", (doc) => {
         if (!doc) return;
         setState({
@@ -128,5 +132,6 @@ export function bootstrapRealtime() {
   return () => {
     unsubAuth();
     stopAll();
+    publicUnsubs.forEach((u) => u());
   };
 }

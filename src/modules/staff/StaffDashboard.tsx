@@ -36,9 +36,13 @@ export function StaffDashboard({ navigate }: { navigate: (p: string) => void }) 
 function StaffQueue() {
   const { appointments, user } = useStore();
   const today = new Date().toISOString().slice(0, 10);
-  const todayAppointments = appointments
-    .filter((a) => a.date === today && a.status !== "cancelled")
-    .sort((a, b) => a.time.localeCompare(b.time));
+
+  // Show today + upcoming (not cancelled), sorted by date+time
+  const queue = appointments
+    .filter((a) => a.date >= today && a.status !== "cancelled")
+    .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+
+  const todayCount = queue.filter((a) => a.date === today).length;
 
   const columns: { key: AppointmentStatus; label: string }[] = [
     { key: "pending", label: "Pending" },
@@ -54,13 +58,13 @@ function StaffQueue() {
             <div className="text-[10px] uppercase tracking-[0.26em] text-gold-300/55">Appointment handling</div>
             <h3 className="font-serif text-2xl text-gold-gradient mt-1">Today's Clinic Queue</h3>
           </div>
-          <Badge tone="neutral">{todayAppointments.length} active today</Badge>
+          <Badge tone="neutral">{todayCount} today · {queue.length} upcoming</Badge>
         </div>
       </Card>
 
       <div className="grid xl:grid-cols-3 gap-4">
         {columns.map((column) => {
-          const list = todayAppointments.filter((a) => a.status === column.key);
+          const list = queue.filter((a) => a.status === column.key);
           return (
             <Card key={column.key}>
               <div className="flex items-center justify-between gap-3 mb-4">
@@ -74,7 +78,7 @@ function StaffQueue() {
                     <div className="flex items-center justify-between gap-3">
                       <div>
                         <div className="font-medium text-gold-100">{a.patientName}</div>
-                        <div className="text-xs text-gold-100/50">{a.serviceName} · {a.time}</div>
+                        <div className="text-xs text-gold-100/50">{a.serviceName} · {a.date === today ? "Today" : a.date} · {a.time}</div>
                       </div>
                       {a.emergency ? <Badge tone="emergency">Emergency</Badge> : <Badge tone="neutral">Regular</Badge>}
                     </div>

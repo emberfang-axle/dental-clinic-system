@@ -12,6 +12,7 @@ import { recordsService } from "../../services/records";
 import { settingsService } from "../../services/settings";
 import { authService } from "../../services/auth";
 import { deleteDocTyped } from "../../services/firestore";
+import { announcementsService } from "../../services/announcements";
 import { useStore } from "../../store/store";
 import { BOOKING, DASHBOARD_TABS } from "../../shared/constants";
 import type { ClinicSettings, StaffPermission } from "../../shared/types";
@@ -36,6 +37,7 @@ export function DoctorDashboard({ navigate }: { navigate: (p: string) => void })
     <DashboardLayout user={user} tabs={tabs} activeTab={tab} onTabChange={setTab} navigate={navigate}>
       {tab === "clinical" && <DoctorClinicalRecords />}
       {tab === "appointments" && <AppointmentsList role="doctor" />}
+      {tab === "announcements" && <AnnouncementsPage />}
       {tab === "schedule" && <DoctorScheduleRules />}
       {tab === "payments" && <PaymentsPage role="doctor" />}
       {tab === "services" && <ServicesPage role="doctor" />}
@@ -153,13 +155,49 @@ function DoctorClinicalRecords() {
           </div>
 
           <div className="mt-4 grid md:grid-cols-2 gap-4">
-            <div><Label>Before Treatment Image URL</Label><Input value={form.beforeImageUrl} onChange={(e) => setForm((p) => ({ ...p, beforeImageUrl: e.target.value }))} placeholder="https://..." /></div>
-            <div><Label>After Treatment Image URL</Label><Input value={form.afterImageUrl} onChange={(e) => setForm((p) => ({ ...p, afterImageUrl: e.target.value }))} placeholder="https://..." /></div>
+            <div>
+              <Label>Before Treatment Photo</Label>
+              <input type="file" accept="image/*" className="mt-1 w-full text-sm text-gold-100/70 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border file:border-gold-500/30 file:bg-ink-900/60 file:text-gold-200 file:text-xs file:cursor-pointer hover:file:border-gold-400/60 cursor-pointer"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  const reader = new FileReader();
+                  reader.onload = () => setForm((p) => ({ ...p, beforeImageUrl: reader.result as string }));
+                  reader.readAsDataURL(file);
+                }}
+              />
+            </div>
+            <div>
+              <Label>After Treatment Photo</Label>
+              <input type="file" accept="image/*" className="mt-1 w-full text-sm text-gold-100/70 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border file:border-gold-500/30 file:bg-ink-900/60 file:text-gold-200 file:text-xs file:cursor-pointer hover:file:border-gold-400/60 cursor-pointer"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  const reader = new FileReader();
+                  reader.onload = () => setForm((p) => ({ ...p, afterImageUrl: reader.result as string }));
+                  reader.readAsDataURL(file);
+                }}
+              />
+            </div>
           </div>
 
           <div className="mt-5 grid md:grid-cols-2 gap-4">
-            <ImagePreview title="Before" src={form.beforeImageUrl} />
-            <ImagePreview title="After" src={form.afterImageUrl} />
+            <div>
+              <ImagePreview title="Before" src={form.beforeImageUrl} />
+              {form.beforeImageUrl && (
+                <button onClick={() => setForm((p) => ({ ...p, beforeImageUrl: "" }))} className="mt-2 text-xs text-red-400 hover:text-red-300 transition">
+                  Remove photo
+                </button>
+              )}
+            </div>
+            <div>
+              <ImagePreview title="After" src={form.afterImageUrl} />
+              {form.afterImageUrl && (
+                <button onClick={() => setForm((p) => ({ ...p, afterImageUrl: "" }))} className="mt-2 text-xs text-red-400 hover:text-red-300 transition">
+                  Remove photo
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="mt-5 flex flex-wrap items-center gap-3">
@@ -420,5 +458,88 @@ function PermissionToggle({ label, enabled, onToggle }: { label: string; enabled
       <div className="text-[11px] uppercase tracking-[0.2em]">{label}</div>
       <div className="mt-1 text-sm font-medium">{enabled ? "Enabled" : "Disabled"}</div>
     </button>
+  );
+}
+
+
+function AnnouncementsPage() {
+  const { announcements, user } = useStore();
+  const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
+  const [pinned, setPinned] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const submitting = { current: false };
+
+  async function post() {
+    if (!title.trim() || !body.trim() || submitting.current) return;
+    submitting.current = true;
+    setSaving(true);
+    setError("");
+    try {
+      await announcementsService.post(title.trim(), body.trim(), user!.name, user!.role, pinned);
+      setTitle(""); setBody(""); setPinned(false);
+    } catch (err: any) {
+      setError(err.message || "Failed to post. Make sure Firestore rules are deployed.");
+    } finally {
+      setSaving(false);
+      submitting.current = false;
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Create form */}
+      <div className="glass-strong rounded-2xl p-6 space-y-4">
+        <h3 className="font-serif text-xl text-gold-gradient">Post Announcement</h3>
+        <div>
+          <Label>Title</Label>
+          <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Clinic closed on May 12" />
+        </div>
+        <div>
+          <Label>Message</Label>
+          <Textarea rows={4} value={body} onChange={(e) => setBody(e.target.value)} placeholder="Write your announcement here..." />
+        </div>
+        <div className="flex items-center gap-4">
+          <label className="flex items-center gap-2 text-sm text-gold-100/70 cursor-pointer">
+            <input type="checkbox" checked={pinned} onChange={(e) => setPinned(e.target.checked)} className="accent-gold-500" />
+            Pin to top
+          </label>
+          <Button onClick={post} disabled={saving || !title.trim() || !body.trim()}>
+            {saving ? "Posting..." : "Post Announcement"}
+          </Button>
+        </div>
+        {error && <p className="text-sm text-red-400">{error}</p>}
+      </div>
+
+      {/* List */}
+      <div className="space-y-3">
+        {announcements.length === 0 && (
+          <div className="glass rounded-xl p-6 text-center text-gold-100/50 text-sm">No announcements yet.</div>
+        )}
+        {announcements.map((a) => (
+          <div key={a.id} className={`glass rounded-xl p-5 border ${a.pinned ? "border-gold-400/40" : "border-gold-500/15"}`}>
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {a.pinned && <span className="text-[10px] uppercase tracking-wider text-gold-400 font-semibold">📌 Pinned</span>}
+                  <h4 className="font-semibold text-gold-100">{a.title}</h4>
+                </div>
+                <p className="text-sm text-gold-100/65 mt-2 leading-relaxed">{a.body}</p>
+                <p className="text-[10px] text-gold-100/40 mt-2">{a.author} · {new Date(a.at).toLocaleString()}</p>
+              </div>
+              <div className="flex gap-2 shrink-0">
+                <button onClick={() => announcementsService.togglePin(a.id)} className="text-xs text-gold-400/60 hover:text-gold-300 transition px-2 py-1 rounded border border-gold-500/20">
+                  {a.pinned ? "Unpin" : "Pin"}
+                </button>
+                <button onClick={() => announcementsService.remove(a.id)} className="text-xs text-red-400/60 hover:text-red-400 transition px-2 py-1 rounded border border-red-500/20">
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }

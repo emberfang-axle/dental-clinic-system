@@ -27,6 +27,7 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
   const [emergency, setEmergency] = useState(false);
   const [confirmed, setConfirmed] = useState<string | null>(null);
   const [bookingError, setBookingError] = useState("");
+  const [booking, setBooking] = useState(false);
 
   const service = services.find((s) => s.id === serviceId)!;
 
@@ -54,14 +55,18 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
   function back() { setStep((s) => Math.max(s - 1, 1)); }
 
   async function confirm() {
+    if (booking) return;
     setBookingError("");
     if (!time) return;
-    if (appointmentsService.isSlotTaken(date, time)) return;
+    if (appointmentsService.isSlotTaken(date, time)) {
+      setBookingError("This time slot was just taken. Please pick another.");
+      return;
+    }
     if (calendarService.isSlotBlocked(date, time)) {
       setBookingError("Selected slot is blocked by clinic calendar.");
       return;
     }
-
+    setBooking(true);
     try {
       const ap = await appointmentsService.book({
         patientId: user!.id,
@@ -78,6 +83,8 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
       setConfirmed(ap.id);
     } catch (err) {
       setBookingError(err instanceof Error ? err.message : "Failed to confirm booking.");
+    } finally {
+      setBooking(false);
     }
   }
 
@@ -234,7 +241,7 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
             {step < 4 ? (
               <Button onClick={next} disabled={step === 3 && !time}>Continue →</Button>
             ) : (
-              <Button onClick={confirm} disabled={!time}>Confirm Appointment ✓</Button>
+              <Button onClick={confirm} disabled={!time || booking}>{booking ? "Booking…" : "Confirm Appointment ✓"}</Button>
             )}
           </div>
           {bookingError && (

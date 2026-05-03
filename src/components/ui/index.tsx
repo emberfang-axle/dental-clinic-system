@@ -211,16 +211,19 @@ export function StatCard({
   label,
   value,
   icon,
+  sub,
 }: {
   label: string;
   value: ReactNode;
   icon: string;
+  sub?: string;
 }) {
   return (
     <Card className="!p-5">
       <div className="text-2xl mb-1">{icon}</div>
       <div className="text-[11px] uppercase tracking-[0.2em] text-gold-100/50">{label}</div>
       <div className="text-2xl font-serif text-gold-gradient mt-1">{value}</div>
+      {sub && <div className="text-[10px] text-gold-100/40 mt-1">{sub}</div>}
     </Card>
   );
 }
