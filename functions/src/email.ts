@@ -1,4 +1,4 @@
-import { onDocumentUpdated } from "firebase-functions/v2/firestore";
+import {onDocumentUpdated} from "firebase-functions/v2/firestore";
 import * as logger from "firebase-functions/logger";
 
 const RESEND_URL = "https://api.resend.com/emails";
@@ -6,12 +6,14 @@ const FROM = "Estandarte Dental <noreply@estandartedental.com>";
 
 async function sendEmail(to: string, subject: string, html: string): Promise<void> {
   const key = process.env.RESEND_API_KEY;
-  if (!key) { logger.warn("RESEND_API_KEY not set — email skipped"); return; }
+  if (!key) {
+    logger.warn("RESEND_API_KEY not set — email skipped"); return;
+  }
 
   const res = await fetch(RESEND_URL, {
     method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-    body: JSON.stringify({ from: FROM, to, subject, html }),
+    headers: {"Content-Type": "application/json", "Authorization": `Bearer ${key}`},
+    body: JSON.stringify({from: FROM, to, subject, html}),
   });
   if (!res.ok) logger.error("Resend error", await res.text());
 }
@@ -23,10 +25,10 @@ async function sendEmail(to: string, subject: string, html: string): Promise<voi
  * Set secret: firebase functions:secrets:set RESEND_API_KEY
  */
 export const appointmentEmail = onDocumentUpdated(
-  { document: "appointments/{id}", secrets: ["RESEND_API_KEY"] },
+  {document: "appointments/{id}", secrets: ["RESEND_API_KEY"]},
   async (event) => {
     const before = event.data?.before.data();
-    const after  = event.data?.after.data();
+    const after = event.data?.after.data();
     if (!before || !after) return;
 
     const email: string | undefined = after.patientEmail;
