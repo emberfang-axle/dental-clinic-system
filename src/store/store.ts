@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from "react";
+﻿import { useSyncExternalStore } from "react";
 import type {
   Appointment,
   AuditLog,
@@ -12,6 +12,7 @@ import type {
 } from "../shared/types";
 
 export interface AppState {
+  authReady: boolean;
   user: User | null;
   users: User[];
   services: Service[];
@@ -25,6 +26,7 @@ export interface AppState {
 }
 
 let state: AppState = {
+  authReady: false,
   user: null,
   users: [],
   services: [],
@@ -56,6 +58,7 @@ export function setState(partial: Partial<AppState>) {
 
 export function resetState() {
   state = {
+  authReady: false,
     user: null,
     users: [],
     services: [],

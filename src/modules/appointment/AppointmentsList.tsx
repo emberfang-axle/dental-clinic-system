@@ -79,6 +79,10 @@ function AppointmentCard({ a, role, isSelf, actor }: { a: Appointment; role: Rol
 
   const update = (data: Partial<Appointment>) => appointmentsService.update(a.id, data, actor);
 
+  const today = new Date().toISOString().slice(0, 10);
+  const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+  const reminderBadge = a.date === today ? "Today" : a.date === tomorrow ? "Tomorrow" : null;
+
   const takenTimes = appointments
     .filter((x) => x.date === newDate && x.id !== a.id && x.status !== "cancelled")
     .map((x) => x.time);

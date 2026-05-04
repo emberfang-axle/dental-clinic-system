@@ -45,11 +45,11 @@ export function DashboardLayout({ user, tabs, activeTab, onTabChange, navigate, 
         <DesktopSidebar user={user} tabs={tabs} activeTab={activeTab} onTabChange={onTabChange} navigate={navigate} />
       </aside>
 
-      {/* Mobile drawer — text labels, same as desktop */}
+      {/* Mobile drawer */}
       {menuOpen && (
         <div className="lg:hidden fixed inset-0 z-40">
           <button className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMenuOpen(false)} aria-label="Close menu" />
-          <aside className="absolute left-0 top-0 h-full w-60 border-r border-gold-soft bg-ink-900/95 backdrop-blur-2xl shadow-2xl flex flex-col">
+          <aside className="absolute left-0 top-0 h-full w-72 max-w-[85vw] border-r border-gold-soft bg-ink-900/98 backdrop-blur-2xl shadow-2xl flex flex-col overflow-hidden">
             <DesktopSidebar
               user={user}
               tabs={tabs}
@@ -132,7 +132,7 @@ function DesktopSidebar({ user, tabs, activeTab, onTabChange, navigate }: {
         </button>
       </div>
 
-      <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto">
+      <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto overscroll-contain">
         {tabs.map((t) => (
           <button key={t.id} onClick={() => onTabChange(t.id)}
             className={`w-full text-left px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${

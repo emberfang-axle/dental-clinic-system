@@ -163,9 +163,9 @@ export function PaymentsPage({ role }: { role: Role }) {
                     <button
                       onClick={() => downloadInvoice(a)}
                       disabled={a.status !== "completed" || a.paymentStatus !== "paid"}
-                      className="text-xs text-gold-400 hover:text-gold-100 underline transition whitespace-nowrap disabled:opacity-30 disabled:cursor-not-allowed disabled:no-underline"
+                      className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md border border-gold-500/30 text-gold-300 hover:bg-gold-500/10 hover:text-gold-100 transition disabled:opacity-30 disabled:cursor-not-allowed whitespace-nowrap"
                     >
-                      Invoice
+                      🖨 Print Invoice
                     </button>
                   </td>
                 </tr>

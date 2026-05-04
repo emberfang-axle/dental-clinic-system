@@ -1,10 +1,9 @@
-/**
+﻿/**
  * Patient (Client) dashboard.
  * My appointments, payment center, treatment records, notifications, feedback, profile.
  */
 
-import { useState } from "react";
-import { Badge, Button, Card, Input, Label, Select, Textarea } from "../../components/ui";
+import { useState } from "react";import { Badge, Button, Card, Input, Label, Select, Textarea } from "../../components/ui";
 import { DashboardLayout } from "../../components/layout/DashboardLayout";
 import { feedbackService } from "../../services/feedback";
 import { paymentsService } from "../../services/payments";
@@ -23,7 +22,6 @@ import {
   RecordBlock,
 } from "../shared/SharedModules";
 
-type AppointmentDraftMap = Record<string, { ref: string; shot: string }>;
 
 export function PatientDashboard({ navigate }: { navigate: (p: string) => void }) {
   const { user } = useStore();
@@ -95,8 +93,6 @@ function PatientPaymentCenter() {
 
       <div className="grid gap-4">
         {mine.map((a) => {
-          const draft = drafts[a.id] || { ref: a.gcashRef || "", shot: a.paymentScreenshotUrl || "" };
-
           return (
             <Card key={a.id}>
               <div className="flex flex-wrap items-start justify-between gap-4">

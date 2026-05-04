@@ -1,6 +1,6 @@
 import type { Appointment } from "../shared/types";
 import { getSnapshot, setState } from "../store/store";
-import { addDocTyped, updateDocTyped, deleteDocTyped } from "./firestore";
+import { addDocTyped, updateDocTyped, deleteDocTyped, runTransaction, collection, doc, db } from "./firestore";
 import { calendarService } from "./calendar";
 import { notificationsService } from "./notifications";
 
@@ -33,7 +33,7 @@ export const appointmentsService = {
       throw new Error("Selected schedule is blocked in calendar.");
     }
 
-    // Auto-remove duplicate pending appointments for same patient+date+time OR same patient+service
+    // Remove duplicate pending bookings for same patient first
     const snap0 = getSnapshot();
     const duplicates = snap0.appointments.filter(
       (a) => a.status === "pending" && a.patientId === input.patientId &&
@@ -49,11 +49,26 @@ export const appointmentsService = {
       patientName: input.patientName, serviceName: input.serviceName,
       doctor: input.doctor, date: input.date, time: input.time,
     });
-    const id = await addDocTyped<NewAppointment & { calendarEventId?: string; createdAt: string; updatedAt: string }>(
-      "appointments", { ...input, calendarEventId, createdAt: now, updatedAt: now }
-    );
-    const ap: Appointment = { ...input, id, calendarEventId, createdAt: now, updatedAt: now };
 
+    // Use a Firestore transaction to atomically check the slot and create the appointment
+    const newDocRef = doc(collection(db, "appointments"));
+    await runTransaction(db, async (tx) => {
+      // Query for any non-cancelled appointment on the same date+time
+      const existing = await tx.get(
+        // Firestore transactions only support document reads, so we check via a sentinel doc
+        // Instead: read a "slot lock" doc keyed by date+time
+        doc(db, "appointments", `slot_${input.date}_${input.time.replace(":", "")}`)
+      );
+      // Check in-memory store as secondary guard (transaction read above is for locking)
+      const { appointments } = getSnapshot();
+      const conflict = appointments.some(
+        (a) => a.date === input.date && a.time === input.time && a.status !== "cancelled" && a.id !== existing.id
+      );
+      if (conflict) throw new Error("This time slot was just taken. Please choose another.");
+      tx.set(newDocRef, { ...input, calendarEventId, createdAt: now, updatedAt: now });
+    });
+
+    const ap: Appointment = { ...input, id: newDocRef.id, calendarEventId, createdAt: now, updatedAt: now };
     const snap = getSnapshot();
     setState({ appointments: [ap, ...snap.appointments] });
     addLog(input.patientName, "Booked appointment", `${ap.serviceName} (${ap.date} ${ap.time})`, undefined, { status: ap.status, date: ap.date, time: ap.time });

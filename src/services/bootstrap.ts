@@ -1,4 +1,4 @@
-import { onAuthStateChanged } from "firebase/auth";
+﻿import { onAuthStateChanged } from "firebase/auth";
 import type { ClinicSettings, StaffPermission, User, Appointment, NotificationEntry, FeedbackEntry, Service, AuditLog } from "../shared/types";
 import { auth } from "./firebase";
 import { listenCollection, listenDoc, listCollection, setDocTyped, qOrderBy, qWhere } from "./firestore";
@@ -62,7 +62,7 @@ export function bootstrapRealtime() {
     // Preserve public data that's managed by always-on listeners
     const { services, feedbacks, announcements } = getSnapshot();
     resetState();
-    setState({ services, feedbacks, announcements });
+    setState({ services, feedbacks, announcements, authReady: true });
 
     // Settings
     unsubs.push(
