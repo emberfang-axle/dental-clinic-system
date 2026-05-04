@@ -1,15 +1,9 @@
+import React, { type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
 /**
  * Reusable UI primitives — design system only, no business logic.
  * Used across landing, auth, and dashboards.
  */
 
-import {
-  type ButtonHTMLAttributes,
-  type InputHTMLAttributes,
-  type ReactNode,
-  type SelectHTMLAttributes,
-  type TextareaHTMLAttributes,
-} from "react";
 import { cn } from "../../utils/cn";
 
 export function Button({
@@ -63,6 +57,45 @@ export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
   );
 }
 
+export function PasswordInput(props: Omit<InputHTMLAttributes<HTMLInputElement>, "type">) {
+  const [show, setShow] = React.useState(false);
+  const fieldId = props.id || props.name || props.placeholder?.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "") || undefined;
+  return (
+    <div className="relative">
+      <input
+        id={fieldId}
+        name={fieldId}
+        {...props}
+        type={show ? "text" : "password"}
+        className={cn(
+          "w-full rounded-md bg-ink-900/60 border border-gold-500/15 px-4 py-3 pr-11 text-gold-50 placeholder:text-gold-100/25 text-sm",
+          "focus:outline-none focus:border-gold-400/60 focus:ring-2 focus:ring-gold-400/20 focus:bg-ink-900 transition",
+          props.className,
+        )}
+      />
+      <button
+        type="button"
+        onClick={() => setShow((s) => !s)}
+        className="absolute right-3 top-1/2 -translate-y-1/2 text-gold-400/60 hover:text-gold-300 transition"
+        aria-label={show ? "Hide password" : "Show password"}
+      >
+        {show ? (
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+            <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+            <line x1="1" y1="1" x2="23" y2="23" />
+          </svg>
+        ) : (
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+            <circle cx="12" cy="12" r="3" />
+          </svg>
+        )}
+      </button>
+    </div>
+  );
+}
+
 export function Textarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return (
     <textarea
@@ -77,8 +110,11 @@ export function Textarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
 }
 
 export function Select(props: SelectHTMLAttributes<HTMLSelectElement>) {
+  const fieldId = props.id || props.name || undefined;
   return (
     <select
+      id={fieldId}
+      name={fieldId}
       {...props}
       className={cn(
         "w-full rounded-md bg-ink-900/60 border border-gold-500/15 px-4 py-3 text-gold-50 text-sm appearance-none cursor-pointer",

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Logo, LogoMark } from "../../components/Logo";
-import { Button, Input, Label, Ornament } from "../../components/ui";
+import { Button, Input, Label, Ornament, PasswordInput } from "../../components/ui";
 import { authService } from "../../services/auth";
 import { useStore } from "../../store/store";
 import { dashboardPathFor } from "../../shared/helpers";
@@ -11,6 +11,7 @@ export function AdminLoginPage({ navigate }: { navigate: (p: string) => void }) 
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
 
   const { user } = useStore();
 
@@ -44,6 +45,17 @@ export function AdminLoginPage({ navigate }: { navigate: (p: string) => void }) 
     }
   }
 
+  async function sendReset() {
+    if (!email) { setError("Enter your email address first, then click Forgot Password."); return; }
+    setError(""); setLoading(true);
+    try {
+      await authService.resetPassword(email);
+      setResetSent(true);
+    } catch (err: any) {
+      setError(err.message || "Failed to send reset email.");
+    } finally { setLoading(false); }
+  }
+
   return (
     <div className="min-h-screen bg-ink-950 relative overflow-hidden flex items-center justify-center p-6">
       <div className="absolute -top-40 -right-40 w-[600px] h-[600px] bg-gold-600/15 rounded-full blur-[120px] pointer-events-none" />
@@ -75,7 +87,7 @@ export function AdminLoginPage({ navigate }: { navigate: (p: string) => void }) 
           </p>
         </div>
 
-        <div className="glass-strong rounded-2xl p-8 shadow-luxe border border-gold-500/20">
+        <div className="glass-strong rounded-2xl p-5 sm:p-8 shadow-luxe border border-gold-500/20">
           <form onSubmit={submit} className="space-y-5">
             <div>
               <Label>Email Address</Label>
@@ -83,7 +95,7 @@ export function AdminLoginPage({ navigate }: { navigate: (p: string) => void }) 
             </div>
             <div>
               <Label>Password</Label>
-              <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required placeholder="••••••••" />
+              <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} required placeholder="••••••••" />
             </div>
             {error && (
               <div className="text-sm text-red-300 bg-red-500/10 border border-red-500/30 rounded-md px-3 py-2">{error}</div>
@@ -91,8 +103,12 @@ export function AdminLoginPage({ navigate }: { navigate: (p: string) => void }) 
             <Button type="submit" className="w-full" size="lg" disabled={loading}>
               {loading ? "Signing in..." : "Sign In"}
             </Button>
+            <button type="button" onClick={sendReset} disabled={loading} className="text-xs text-gold-400/60 hover:text-gold-300 transition text-center w-full">
+              Forgot Password? Send reset link
+            </button>
           </form>
         </div>
+        {resetSent && (<div className="mt-4 rounded-xl border border-gold-500/30 bg-gold-500/8 p-4 text-center space-y-2"><div className="text-2xl">✉</div><p className="text-sm font-semibold text-gold-200">Reset link sent!</p><p className="text-xs text-gold-100/60">We sent a password reset link to <span className="text-gold-300 font-medium">{email}</span>. Check your inbox and click the link to set a new password.</p><p className="text-[10px] text-gold-100/40">After resetting, return here to sign in. Check spam if not received.</p></div>)}
 
         <p className="text-center text-sm text-gold-100/55 mt-6 font-light">
           Patient?{" "}

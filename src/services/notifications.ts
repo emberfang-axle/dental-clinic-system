@@ -1,5 +1,5 @@
 import type { NotificationEntry, NotificationKind } from "../shared/types";
-import { addDocTyped, updateDocTyped, listCollection, qWhere } from "./firestore";
+import { addDocTyped, updateDocTyped } from "./firestore";
 import { getSnapshot, setState } from "../store/store";
 
 function nowISO() { return new Date().toISOString(); }

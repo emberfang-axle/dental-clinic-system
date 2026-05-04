@@ -29,6 +29,7 @@ export const DASHBOARD_TABS: Record<Role, DashboardTab[]> = {
     { id: "staff",         label: "Staff & Doctors",    icon: "👥" },
     { id: "reports",       label: "Analytics",          icon: "📊" },
     { id: "settings",      label: "Settings",           icon: "⚙️" },
+    { id: "notifications", label: "Notifications",      icon: "bell" },
     { id: "profile",       label: "Profile",            icon: "👤" },
   ],
   doctor: [
@@ -41,6 +42,7 @@ export const DASHBOARD_TABS: Record<Role, DashboardTab[]> = {
     { id: "staff",          label: "Staff Accounts",     icon: "👥" },
     { id: "reports",        label: "Analytics",          icon: "📊" },
     { id: "audit",          label: "Audit Logs",         icon: "🔒" },
+    { id: "notifications", label: "Notifications",      icon: "bell" },
     { id: "profile",        label: "Profile",            icon: "👤" },
   ],
   staff: [
@@ -48,6 +50,7 @@ export const DASHBOARD_TABS: Record<Role, DashboardTab[]> = {
     { id: "appointments",  label: "Appointments",       icon: "📋" },
     { id: "payments",      label: "Payments",           icon: "💳" },
     { id: "records",       label: "Records Support",    icon: "🗂️" },
+    { id: "notifications", label: "Notifications",      icon: "bell" },
     { id: "profile",       label: "Profile",            icon: "👤" },
   ],
   patient: [

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Logo, LogoMark } from "../../components/Logo";
-import { Button, Input, Label, Ornament } from "../../components/ui";
+import { Button, Input, Label, Ornament, PasswordInput } from "../../components/ui";
 import { authService } from "../../services/auth";
 import { useStore } from "../../store/store";
 import { dashboardPathFor } from "../../shared/helpers";
@@ -11,6 +11,7 @@ export function LoginPage({ navigate }: { navigate: (p: string) => void }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
   
   const { user } = useStore();
 
@@ -37,6 +38,14 @@ export function LoginPage({ navigate }: { navigate: (p: string) => void }) {
     }
   }
 
+  async function sendReset() {
+    if (!email) { setError("Enter your email address first, then click Forgot."); return; }
+    setError(""); setLoading(true);
+    try { await authService.resetPassword(email); setResetSent(true); }
+    catch (err: any) { setError(err.message || "Failed to send reset email."); }
+    finally { setLoading(false); }
+  }
+
   return (
     <AuthLayout navigate={navigate}>
       <div className="w-full max-w-md fade-up">
@@ -53,20 +62,18 @@ export function LoginPage({ navigate }: { navigate: (p: string) => void }) {
           </p>
         </div>
 
-        <div className="glass-strong rounded-2xl p-8 shadow-luxe">
+        <div className="glass-strong rounded-2xl p-5 sm:p-8 shadow-luxe">
           <form onSubmit={submit} className="space-y-5">
             <div>
               <Label>Email Address</Label>
               <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="you@example.com" />
             </div>
             <div>
-              <div className="flex items-center justify-between mb-2">
-                <Label>Password</Label>
-                <button type="button" className="text-[10px] uppercase tracking-wider text-gold-400 hover:text-gold-300 transition">
-                  Forgot?
-                </button>
-              </div>
-              <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required placeholder="••••••••" />
+              <Label>Password</Label>
+              <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} required placeholder="••••••••" />
+              <button type="button" onClick={sendReset} disabled={loading} className="mt-2 w-full text-center text-[11px] text-gold-400/70 hover:text-gold-300 transition">
+                Forgot password?
+              </button>
             </div>
             {error && (
               <div className="text-sm text-red-300 bg-red-500/10 border border-red-500/30 rounded-md px-3 py-2">{error}</div>
@@ -74,6 +81,7 @@ export function LoginPage({ navigate }: { navigate: (p: string) => void }) {
             <Button type="submit" className="w-full" size="lg" disabled={loading}>
               {loading ? "Signing in..." : "Sign In"}
             </Button>
+            {resetSent && (<div className="rounded-xl border border-gold-500/30 bg-gold-500/8 p-4 text-center space-y-2"><div className="text-2xl">✉</div><p className="text-sm font-semibold text-gold-200">Reset link sent!</p><p className="text-xs text-gold-100/60">We sent a password reset link to <span className="text-gold-300 font-medium">{email}</span>. Check your inbox and click the link to set a new password.</p><p className="text-[10px] text-gold-100/40">After resetting, return here to sign in. Check spam if not received.</p></div>)}
           </form>
         </div>
 
@@ -136,7 +144,7 @@ export function RegisterPage({ navigate }: { navigate: (p: string) => void }) {
           </p>
         </div>
 
-        <div className="glass-strong rounded-2xl p-8 shadow-luxe">
+        <div className="glass-strong rounded-2xl p-5 sm:p-8 shadow-luxe">
           <form onSubmit={submit} className="space-y-5">
             <div>
               <Label>Full Name</Label>
@@ -152,7 +160,7 @@ export function RegisterPage({ navigate }: { navigate: (p: string) => void }) {
             </div>
             <div>
               <Label>Password</Label>
-              <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required placeholder="••••••••" minLength={6} />
+              <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} required placeholder="••••••••" minLength={6} />
             </div>
             {error && (
               <div className="text-sm text-red-300 bg-red-500/10 border border-red-500/30 rounded-md px-3 py-2">{error}</div>

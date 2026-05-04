@@ -3,6 +3,7 @@ import type { ClinicSettings, StaffPermission, User, Appointment, NotificationEn
 import { auth } from "./firebase";
 import { listenCollection, listenDoc, listCollection, setDocTyped, qOrderBy, qWhere } from "./firestore";
 import { resetState, setState, getSnapshot } from "../store/store";
+import { scheduleAlertsService } from "./scheduleAlerts";
 
 const DEFAULT_SERVICES: Omit<Service, "id">[] = [
   { name: "Tooth Extraction",         price: 800,   duration: 45, description: "Safe and gentle removal of damaged or decayed teeth." },
@@ -83,6 +84,7 @@ export function bootstrapRealtime() {
     unsubProfile = listenDoc<User>("users", firebaseUser.uid, (profile) => {
       setState({ user: profile as any });
       attachRoleListeners(profile?.role ?? null);
+      if (profile) setTimeout(() => scheduleAlertsService.runForUser(profile), 3000);
     });
 
     // Notifications — where only, no orderBy → no composite index needed
@@ -111,7 +113,7 @@ export function bootstrapRealtime() {
         appointmentUnsub = listenCollection<Appointment>(
           "appointments",
           (a) => setState({ appointments: [...a].sort(byDateDesc) }),
-          [qWhere("patientId", "==", firebaseUser.uid)] as any
+          [qWhere("patientId", "==", firebaseUser!.uid)] as any
         );
       } else if (role) {
         // no where, orderBy only → single-field index

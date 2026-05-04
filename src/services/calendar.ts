@@ -44,6 +44,32 @@ export const calendarService = {
     }
   },
 
+  blockDate(date: string, reason = "Doctor unavailable") {
+    const slots = readBlockedSlots().filter((s) => s.date !== date);
+    const allSlots = ["09:00","10:00","11:00","1:00","2:00","3:00","4:00"];
+    writeBlockedSlots([...slots, ...allSlots.map((time) => ({ date, time, reason }))]);
+  },
+
+  unblockDate(date: string) {
+    writeBlockedSlots(readBlockedSlots().filter((s) => s.date !== date));
+  },
+
+  isDateBlocked(date: string) {
+    const allSlots = ["09:00","10:00","11:00","1:00","2:00","3:00","4:00"];
+    return allSlots.every((t) => readBlockedSlots().some((s) => s.date === date && s.time === t));
+  },
+
+  blockDate(date: string, reason = "Doctor unavailable") {
+    // Block all time slots for the given date
+    const slots = readBlockedSlots().filter((s) => s.date !== date);
+    const allSlots = ["09:00","10:00","11:00","1:00","2:00","3:00","4:00"];
+    writeBlockedSlots([...slots, ...allSlots.map((time) => ({ date, time, reason }))]);
+  },
+
+  unblockDate(date: string) {
+    writeBlockedSlots(readBlockedSlots().filter((s) => s.date !== date));
+  },
+
   unblockSlot(date: string, time: string) {
     writeBlockedSlots(readBlockedSlots().filter((s) => !(s.date === date && s.time === time)));
   },

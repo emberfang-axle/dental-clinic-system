@@ -3,6 +3,8 @@ import {
   signInWithEmailAndPassword,
   signOut,
   updateProfile as updateFirebaseProfile,
+  verifyBeforeUpdateEmail,
+  sendPasswordResetEmail,
   signInWithRedirect,
   getRedirectResult,
   getAuth,
@@ -93,16 +95,32 @@ export const authService = {
 
   async updateProfile(userId: string, partial: Partial<User>, actor = "system") {
     void actor;
-    await updateDocTyped<User>("users", userId, partial as any);
+
+    // If email is changing, send verification first — do NOT save new email to Firestore yet.
+    // Firestore email stays as the current one until the user verifies and re-logs in.
+    const emailChanging = !!(partial.email && auth.currentUser?.uid === userId
+      && partial.email !== auth.currentUser.email);
+
+    if (emailChanging) {
+      await verifyBeforeUpdateEmail(auth.currentUser!, partial.email!);
+    }
+
+    // Save everything except the new unverified email
+    const { email: _e, ...restPartial } = partial as any;
+    const firestoreUpdate = emailChanging ? restPartial : partial;
+
+    if (Object.keys(firestoreUpdate).length > 0) {
+      await updateDocTyped<User>("users", userId, firestoreUpdate as any);
+    }
 
     const { appointments, user } = getSnapshot();
 
-    // Update the logged-in user in the store
+    // Update store (excluding unverified email)
     if (user && user.id === userId) {
-      setState({ user: { ...user, ...partial } });
+      setState({ user: { ...user, ...firestoreUpdate } });
     }
 
-    // If name changed, sync it to all appointments for this patient (except cancelled)
+    // Sync name to appointments
     if (partial.name) {
       const toSync = appointments.filter(
         (a) => a.patientId === userId && a.status !== "cancelled"
@@ -118,5 +136,10 @@ export const authService = {
     }
 
     return getDocTyped<User>("users", userId);
+  },
+
+  async resetPassword(email: string) {
+    const continueUrl = window.location.origin + window.location.pathname + "#/login";
+    await sendPasswordResetEmail(auth, email.trim().toLowerCase(), { url: continueUrl, handleCodeInApp: false });
   },
 };

@@ -8,10 +8,11 @@ import { Badge, Button, Card, Input, Label, Select, Textarea } from "../../compo
 import { DashboardLayout } from "../../components/layout/DashboardLayout";
 import { feedbackService } from "../../services/feedback";
 import { paymentsService } from "../../services/payments";
+import { uploadFile, gcashScreenshotPath } from "../../services/upload";
 import { useStore } from "../../store/store";
 import { DASHBOARD_TABS, ROUTES } from "../../shared/constants";
 import { formatDateTime, receiptHref } from "../../shared/helpers";
-import { downloadInvoice } from "../../utils/invoice";
+import { downloadInvoice, downloadTreatmentNotes } from "../../utils/invoice";
 import type { Appointment } from "../../shared/types";
 import { AppointmentsList } from "../appointment/AppointmentsList";
 import { PaymentBadge } from "../appointment/AppointmentsList";
@@ -58,17 +59,21 @@ function PatientPaymentCenter() {
   const mine = appointments
     .filter((a) => a.patientId === user!.id && a.status !== "cancelled")
     .sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
-  const [drafts, setDrafts] = useState<AppointmentDraftMap>({});
+  const [refs, setRefs] = useState<Record<string, string>>({});
+  const [uploading, setUploading] = useState<Record<string, number | null>>({});
 
-  const updateDraft = (appointment: Appointment, key: "ref" | "shot", value: string) => {
-    setDrafts((prev) => ({
-      ...prev,
-      [appointment.id]: {
-        ref: prev[appointment.id]?.ref ?? appointment.gcashRef ?? "",
-        shot: prev[appointment.id]?.shot ?? appointment.paymentScreenshotUrl ?? "",
-        [key]: value,
-      },
-    }));
+  const handleUpload = async (appointmentId: string, file: File) => {
+    setUploading((p) => ({ ...p, [appointmentId]: 0 }));
+    try {
+      const url = await uploadFile(
+        file,
+        gcashScreenshotPath(appointmentId, file.name),
+        (pct) => setUploading((p) => ({ ...p, [appointmentId]: pct }))
+      );
+      await paymentsService.saveProof(appointmentId, refs[appointmentId] || "", url, user!.name);
+    } finally {
+      setUploading((p) => ({ ...p, [appointmentId]: null }));
+    }
   };
 
   return (
@@ -77,9 +82,9 @@ function PatientPaymentCenter() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <div className="text-[10px] uppercase tracking-[0.26em] text-gold-300/55">Payment process</div>
-            <h3 className="font-serif text-2xl text-gold-gradient mt-1">GCash & Cash Payment Center</h3>
+            <h3 className="font-serif text-2xl text-gold-gradient mt-1">Payment Center</h3>
             <p className="mt-2 text-sm text-gold-100/60">
-              Submit your GCash reference, attach screenshot proof, track payment status, and download receipts when available.
+              For GCash: send payment to the clinic number below, then submit your reference number here for staff to confirm.
             </p>
           </div>
           <div className="rounded-xl border border-gold-500/15 bg-gold-500/5 px-4 py-3 text-sm text-gold-100">
@@ -91,6 +96,7 @@ function PatientPaymentCenter() {
       <div className="grid gap-4">
         {mine.map((a) => {
           const draft = drafts[a.id] || { ref: a.gcashRef || "", shot: a.paymentScreenshotUrl || "" };
+
           return (
             <Card key={a.id}>
               <div className="flex flex-wrap items-start justify-between gap-4">
@@ -100,7 +106,7 @@ function PatientPaymentCenter() {
                     <Badge tone={a.status as "pending" | "confirmed" | "completed" | "cancelled"}>{a.status}</Badge>
                     <PaymentBadge status={a.paymentStatus} method={a.paymentMethod === "gcash" ? "GCash" : "Cash"} />
                   </div>
-                  <p className="mt-2 text-sm text-gold-100/60">{a.date} at {a.time} · Locked price ₱{a.price.toLocaleString()}</p>
+                  <p className="mt-2 text-sm text-gold-100/60">{a.date} at {a.time} · ₱{a.price.toLocaleString()}</p>
                 </div>
                 {a.receiptNumber && (
                   <a href={receiptHref(a)} download={`${a.receiptNumber}.txt`} className="text-sm text-gold-300 underline">
@@ -110,39 +116,85 @@ function PatientPaymentCenter() {
                 <button
                   onClick={() => downloadInvoice(a)}
                   disabled={a.status !== "completed" || a.paymentStatus !== "paid"}
-                  title={a.status !== "completed" ? "Available after appointment is completed" : a.paymentStatus !== "paid" ? "Available after payment is confirmed" : "Download Invoice"}
                   className="text-sm text-gold-300 hover:text-gold-100 underline transition disabled:opacity-30 disabled:cursor-not-allowed disabled:no-underline"
                 >
                   Download Invoice
                 </button>
               </div>
 
-              {a.paymentMethod === "gcash" ? (
-                <div className="mt-5 grid md:grid-cols-2 gap-4">
-                  <div>
-                    <Label>GCash Reference Number</Label>
-                    <Input value={draft.ref} onChange={(e) => updateDraft(a, "ref", e.target.value)} placeholder="Enter reference number" />
+              <div className="mt-5">
+                {a.paymentStatus === "paid" && (
+                  <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 text-sm text-emerald-400">
+                    ✓ Payment confirmed via {a.paymentMethod === "gcash" ? "GCash" : "Cash"}.
                   </div>
-                  <div>
-                    <Label>Screenshot URL (optional)</Label>
-                    <Input value={draft.shot} onChange={(e) => updateDraft(a, "shot", e.target.value)} placeholder="Paste uploaded proof URL" />
+                )}
+
+                {a.paymentStatus === "verified" && (
+                  <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-4 text-sm text-blue-300">
+                    ✓ GCash verified by staff — awaiting final posting.
                   </div>
-                  <div className="md:col-span-2 flex flex-wrap items-center gap-3">
-                    <Button onClick={() => paymentsService.saveProof(a.id, draft.ref, draft.shot || undefined, user!.name)}>
-                      Submit / Update Proof
-                    </Button>
-                    {a.paymentScreenshotUrl && (
-                      <a href={a.paymentScreenshotUrl} target="_blank" rel="noreferrer" className="text-sm text-gold-300 underline">
-                        View current screenshot
-                      </a>
-                    )}
+                )}
+
+                {a.paymentMethod === "gcash" && a.paymentStatus === "pending_verification" && (
+                  <div className="space-y-4">
+                    <div className="rounded-xl border border-yellow-500/20 bg-yellow-500/5 p-3 text-xs text-gold-100/70">
+                      Send ₱{a.price.toLocaleString()} to GCash <span className="font-semibold text-gold-300">{settings.gcashNumber}</span>, then submit your reference number and screenshot below.
+                    </div>
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div>
+                        <Label>GCash Reference Number</Label>
+                        <Input
+                          value={refs[a.id] ?? a.gcashRef ?? ""}
+                          onChange={(e) => setRefs((p) => ({ ...p, [a.id]: e.target.value }))}
+                          placeholder="e.g. 1234567890"
+                        />
+                      </div>
+                      <div>
+                        <Label>Upload Screenshot</Label>
+                        <input
+                          type="file" accept="image/*"
+                          disabled={!!uploading[a.id]}
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleUpload(a.id, file);
+                          }}
+                          className="mt-1 w-full text-sm text-gold-100/70 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border file:border-gold-500/30 file:bg-ink-900/60 file:text-gold-200 file:text-xs file:cursor-pointer hover:file:border-gold-400/60"
+                        />
+                        {uploading[a.id] != null && (
+                          <div className="mt-2 h-1.5 bg-ink-700 rounded-full overflow-hidden">
+                            <div className="h-full bg-gold-gradient transition-all" style={{ width: `${uploading[a.id]}%` }} />
+                          </div>
+                        )}
+                      </div>
+                      <div className="md:col-span-2 flex flex-wrap items-center gap-3">
+                        <Button
+                          disabled={!!uploading[a.id]}
+                          onClick={() => paymentsService.saveProof(a.id, refs[a.id] || a.gcashRef || "", a.paymentScreenshotUrl, user!.name)}
+                        >
+                          Submit Reference
+                        </Button>
+                        {a.paymentScreenshotUrl && (
+                          <a href={a.paymentScreenshotUrl} target="_blank" rel="noreferrer" className="text-sm text-gold-300 underline">
+                            View submitted screenshot
+                          </a>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              ) : (
-                <div className="mt-5 rounded-xl border border-gold-500/15 bg-ink-900/55 p-4 text-sm text-gold-100/65">
-                  Cash appointments are settled at the clinic and will be updated by staff after treatment or upon payment confirmation.
-                </div>
-              )}
+                )}
+
+                {a.paymentMethod === "cash" && a.paymentStatus !== "paid" && (
+                  <div className="rounded-xl border border-gold-500/15 bg-ink-900/55 p-4 text-sm text-gold-100/65">
+                    Cash payment will be collected at the clinic and confirmed by staff.
+                  </div>
+                )}
+
+                {a.paymentStatus === "unpaid" && a.status === "completed" && (
+                  <div className="rounded-xl border border-gold-500/15 bg-ink-900/55 p-4 text-sm text-gold-100/50">
+                    Awaiting staff to create your bill.
+                  </div>
+                )}
+              </div>
             </Card>
           );
         })}
@@ -186,6 +238,14 @@ function PatientTreatmentRecords() {
               <a href={receiptHref(a)} download={`${a.receiptNumber}.txt`} className="text-sm text-gold-300 underline">
                 Download Receipt
               </a>
+            )}
+            {(a.diagnosis || a.notes || a.treatmentPlan || a.dentalHistory) && (
+              <button
+                onClick={() => downloadTreatmentNotes(a)}
+                className="text-sm text-gold-300 hover:text-gold-100 underline transition"
+              >
+                Download Notes
+              </button>
             )}
           </div>
 

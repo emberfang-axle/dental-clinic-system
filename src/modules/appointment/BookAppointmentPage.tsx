@@ -25,6 +25,7 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
   });
   const [time, setTime] = useState("");
   const [emergency, setEmergency] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<"cash" | "gcash">("cash");
   const [confirmed, setConfirmed] = useState<string | null>(null);
   const [bookingError, setBookingError] = useState("");
   const [booking, setBooking] = useState(false);
@@ -76,7 +77,7 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
         price: service.price,
         doctor, date, time,
         status: "pending",
-        paymentMethod: "cash" as const,
+        paymentMethod: paymentMethod,
         paymentStatus: "unpaid" as const,
         emergency,
       });
@@ -103,7 +104,16 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
             <span className="text-gold-300 font-medium">{time}</span> has been received.
           </p>
           <p className="text-sm text-gold-100/55 mt-3">
-            {"Please arrive 10 minutes before your scheduled appointment."}
+            <p className="text-sm text-gold-100/55 mt-3">Please arrive 10 minutes before your scheduled appointment.</p>
+            {paymentMethod === "gcash" ? (
+              <div className="mt-4 rounded-xl border border-gold-500/25 bg-gold-500/8 p-4 text-sm text-gold-100/70">
+                <span className="text-gold-300 font-medium">GCash Payment:</span> After your treatment, scan the clinic GCash QR or send to the clinic number, then submit your reference number in your <span className="text-gold-300">Payment Center</span>.
+              </div>
+            ) : (
+              <div className="mt-4 rounded-xl border border-gold-500/25 bg-gold-500/8 p-4 text-sm text-gold-100/70">
+                <span className="text-gold-300 font-medium">Cash Payment:</span> Prepare your cash on the day. Staff will collect payment after your treatment.
+              </div>
+            )}
           </p>
           <div className="mt-8 flex justify-center gap-3">
             <Button onClick={() => navigate(dashboardPathFor(user.role))}>Go to Dashboard</Button>
@@ -125,7 +135,7 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
         <Button variant="ghost" size="sm" onClick={() => navigate(dashboardPathFor(user.role))}>Cancel</Button>
       </header>
 
-      <div className="relative max-w-4xl mx-auto px-6 py-12">
+      <div className="relative max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
         <div className="text-center mb-10">
           <p className="text-[10px] uppercase tracking-[0.4em] text-gold-400 font-semibold mb-3">Step {step} of 4</p>
           <h1 className="font-serif text-4xl md:text-5xl text-gold-shine font-light">
@@ -154,7 +164,7 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
           })}
         </div>
 
-        <div className="rounded-2xl glass-strong p-8 shadow-luxe fade-up">
+        <div className="rounded-2xl glass-strong p-4 sm:p-8 shadow-luxe fade-up">
           {step === 1 && (
             <div>
               <h3 className="font-serif text-2xl text-gold-shine mb-1">Select a Service</h3>
@@ -230,9 +240,32 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
                 <Row label="Date & Time" value={`${date} · ${time || "—"}`} />
                 {emergency && <Row label="Priority" value={<Badge tone="emergency">EMERGENCY</Badge>} />}
               </div>
-              <p className="mt-5 text-xs text-gold-100/50">
-                Payment will be handled at the clinic on the day of your appointment.
-              </p>
+
+              <div className="mt-6">
+                <p className="text-xs uppercase tracking-[0.2em] text-gold-300/60 mb-3">Payment Method</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <button type="button" onClick={() => setPaymentMethod("cash")} className={`p-4 rounded-xl border-2 text-left transition ${paymentMethod === "cash" ? "border-gold-400 bg-gold-500/10" : "border-gold-500/20 hover:border-gold-400/50"}`}>
+                    <div className="text-lg mb-1">💵</div>
+                    <div className="font-semibold text-gold-100 text-sm">Cash</div>
+                    <div className="text-xs text-gold-100/50 mt-0.5">Pay at the clinic after treatment</div>
+                  </button>
+                  <button type="button" onClick={() => setPaymentMethod("gcash")} className={`p-4 rounded-xl border-2 text-left transition ${paymentMethod === "gcash" ? "border-gold-400 bg-gold-500/10" : "border-gold-500/20 hover:border-gold-400/50"}`}>
+                    <div className="text-lg mb-1">📱</div>
+                    <div className="font-semibold text-gold-100 text-sm">GCash</div>
+                    <div className="text-xs text-gold-100/50 mt-0.5">Scan QR or send to clinic number</div>
+                  </button>
+                </div>
+                {paymentMethod === "gcash" && (
+                  <div className="mt-3 rounded-xl border border-gold-500/20 bg-gold-500/5 p-3 text-xs text-gold-100/60">
+                    After your treatment, scan the clinic GCash QR or send payment to the clinic number. Then submit your reference number in the Payment Center.
+                  </div>
+                )}
+                {paymentMethod === "cash" && (
+                  <div className="mt-3 rounded-xl border border-gold-500/20 bg-gold-500/5 p-3 text-xs text-gold-100/60">
+                    Prepare your cash payment on the day of your appointment. Staff will collect after treatment.
+                  </div>
+                )}
+              </div>
             </div>
           )}
 

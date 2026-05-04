@@ -42,6 +42,25 @@ body {
   overflow-x: hidden;
 }
 
+/* Prevent horizontal scroll on mobile — only on block-level elements */
+html, body, #root {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
+img, video, canvas {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Tighter font on very small screens (320px–390px) */
+@media (max-width: 390px) {
+  html { font-size: 13px; }
+}
+@media (min-width: 391px) and (max-width: 640px) {
+  html { font-size: 14px; }
+}
+
 p {
   text-wrap: pretty;
   line-height: 1.7;
@@ -65,11 +84,8 @@ label, th, .uppercase {
 }
 
 /* Buttons + tappable controls — minimum 44px touch target */
-button, a[role="button"], .btn, [type="button"], [type="submit"] {
+[type="button"]:not(.no-min), [type="submit"]:not(.no-min), a[role="button"]:not(.no-min) {
   min-height: 44px;
-}
-button.no-min, a.no-min {
-  min-height: 0;
 }
 
 /* Form fields — comfortable height */

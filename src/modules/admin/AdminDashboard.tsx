@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { PasswordInput } from "../../components/ui";
 import { useStore } from "../../store/store";
 import { ROUTES } from "../../shared/constants";
 import { Button, Input, Label } from "../../components/ui";
@@ -201,7 +202,7 @@ function CreateStaffAccountForm() {
           </div>
           <div>
             <Label>Password</Label>
-            <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required placeholder="••••••••" minLength={6} />
+            <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} required placeholder="••••••••" minLength={6} />
           </div>
           <div>
             <Label>Role</Label>

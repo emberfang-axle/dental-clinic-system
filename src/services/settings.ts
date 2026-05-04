@@ -1,5 +1,6 @@
-import type { ClinicSettings, StaffPermission, User } from "../shared/types";
+import type { ClinicSettings, StaffPermission, StaffSubRole, User } from "../shared/types";
 import { getSnapshot, setState } from "../store/store";
+import { updateDocTyped, deleteDocTyped } from "./firestore";
 import { notificationsService } from "./notifications";
 
 function makeId(prefix: string) {
@@ -11,7 +12,7 @@ export const settingsService = {
     const snap = getSnapshot();
     setState({ settings: { ...snap.settings, ...partial } as ClinicSettings });
     if (snap.user) {
-      notificationsService.system(snap.user.id, "Clinic settings updated", `Updated by ${actor}.`, "system");
+      notificationsService.notify(snap.user.id, "Clinic settings updated", `Updated by ${actor}.`, "system");
     }
   },
 
@@ -21,7 +22,7 @@ export const settingsService = {
       p.staffId === staffId ? ({ ...p, ...partial } as StaffPermission) : p
     );
     setState({ staffPermissions: next });
-    notificationsService.system(staffId, "Permissions updated", `Updated by ${actor}.`, "system");
+    notificationsService.notify(staffId, "Permissions updated", `Updated by ${actor}.`, "system");
   },
 
   addStaff(name: string, email: string, phone: string, actor: string) {
@@ -48,8 +49,20 @@ export const settingsService = {
       staffPermissions: [perms, ...snap.staffPermissions],
     });
 
-    notificationsService.system(staff.id, "Staff account created", `Created by ${actor}.`, "system");
+    notificationsService.notify(staff.id, "Staff account created", `Created by ${actor}.`, "system");
     return staff;
+  },
+
+  async updateStaffSubRole(staffId: string, subRole: StaffSubRole) {
+    await updateDocTyped("users", staffId, { subRole } as any);
+    const { users } = getSnapshot();
+    setState({ users: users.map((u) => u.id === staffId ? { ...u, subRole } : u) });
+  },
+
+  async removeStaff(staffId: string) {
+    await deleteDocTyped("users", staffId);
+    const { users } = getSnapshot();
+    setState({ users: users.filter((u) => u.id !== staffId) });
   },
 };
 

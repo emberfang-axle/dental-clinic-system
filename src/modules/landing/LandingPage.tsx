@@ -19,7 +19,7 @@ const navLinks = [
 ];
 
 export function LandingPage({ navigate }: { navigate: (p: string) => void }) {
-  const { services, user, feedbacks } = useStore();
+  const { services, user } = useStore();
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenu, setMobileMenu] = useState(false);
   const [showAllServices, setShowAllServices] = useState(false);
@@ -45,7 +45,7 @@ export function LandingPage({ navigate }: { navigate: (p: string) => void }) {
       <div className="fixed bottom-0 left-0 w-[500px] h-[500px] bg-gold-500/8 rounded-full blur-[100px] pointer-events-none" />
 
       {/* Nav */}
-      <header className={`sticky top-0 z-50 transition-all duration-500 ${scrolled ? "bg-ink-950/85 backdrop-blur-xl border-b border-gold-soft py-2" : "bg-transparent py-4"}`}>
+      <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${scrolled ? "bg-ink-950/85 backdrop-blur-xl border-b border-gold-soft py-2" : "bg-transparent py-4"}`}>
         <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
           <button onClick={() => navigate(ROUTES.home)} className="cursor-pointer hover:opacity-90 transition">
             <Logo size={42} />
@@ -98,9 +98,9 @@ export function LandingPage({ navigate }: { navigate: (p: string) => void }) {
       </header>
 
       {/* HERO */}
-      <section id="home" className="relative min-h-[92vh] flex items-center overflow-hidden">
+      <section id="home" className="relative min-h-[70vh] flex items-center overflow-hidden pt-20">
         <div className="absolute inset-0">
-          <img src="/images/hero-dental.jpg" alt="" className="w-full h-full object-cover object-center opacity-40" />
+          <img src="/images/hero-dental.jpg" alt="" className="absolute inset-0 w-full h-full opacity-35" style={{objectFit:"contain",objectPosition:"center center"}} />
           <div className="absolute inset-0 bg-gradient-to-r from-ink-950 via-ink-950/80 to-ink-950/30" />
           <div className="absolute inset-0 bg-gradient-to-t from-ink-950 via-transparent to-ink-950/60" />
           <div className="absolute inset-0 pattern-grid opacity-40" />
@@ -209,10 +209,10 @@ export function LandingPage({ navigate }: { navigate: (p: string) => void }) {
               reflects the standard our name was built on.
             </p>
             <div className="grid grid-cols-2 gap-4 pt-4">
-              <FeatureBadge icon="🏛️" title={`Established ${CLINIC.yearFounded}`} subtitle="Compostela, DDO" />
-              <FeatureBadge icon="👩‍⚕️" title="Licensed Doctors" subtitle="Board-certified" />
-              <FeatureBadge icon="💎" title="Modern Equipment" subtitle="Digital workflows" />
-              <FeatureBadge icon="❤️" title="Patient-First" subtitle="Compassionate care" />
+              <FeatureBadge title={`Established ${CLINIC.yearFounded}`} subtitle="Compostela, DDO" />
+              <FeatureBadge title="Licensed Doctors" subtitle="Board-certified" />
+              <FeatureBadge title="Modern Equipment" subtitle="Digital workflows" />
+              <FeatureBadge title="Patient-First" subtitle="Compassionate care" />
             </div>
           </div>
         </div>
@@ -240,13 +240,10 @@ export function LandingPage({ navigate }: { navigate: (p: string) => void }) {
               { t: "Secure Payments", d: "Pay with GCash or cash, with verified transaction tracking." },
               { t: "Real-Time Scheduling", d: "Powered by Google Calendar — no double-bookings, ever." },
               { t: "Patient-First Approach", d: "Every detail tailored around your comfort and confidence." },
-            ].map((f, index) => (
+            ].map((f) => (
               <div key={f.t} className="group relative rounded-xl glass p-7 hover:border-gold-400/50 transition-all duration-500 hover:-translate-y-1 hover:shadow-luxe">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-gold-500/5 rounded-full blur-3xl group-hover:bg-gold-500/15 transition" />
                 <div className="relative">
-                  <div className="w-12 h-12 rounded-lg bg-gold-gradient/10 border border-gold-500/30 flex items-center justify-center mb-5 text-gold-300 font-mono text-sm group-hover:scale-110 group-hover:border-gold-400 transition">
-                    0{index + 1}
-                  </div>
                   <h3 className="font-serif text-xl text-gold-100 mb-2">{f.t}</h3>
                   <p className="text-sm text-gold-100/55 leading-relaxed">{f.d}</p>
                 </div>
@@ -264,11 +261,8 @@ export function LandingPage({ navigate }: { navigate: (p: string) => void }) {
         subtitle="From routine cleanings to bespoke cosmetic transformations — every procedure is delivered with the highest standard of care."
       >
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 stagger">
-          {displayedServices.map((s, i) => (
+          {displayedServices.map((s) => (
             <div key={s.id} className="group relative rounded-xl overflow-hidden glass hover:border-gold-400/50 transition-all duration-500 hover:-translate-y-2 hover:shadow-luxe">
-              <div className="absolute top-0 right-0 w-24 h-24">
-                <div className="absolute top-3 right-3 text-[10px] text-gold-400/60 font-mono">{String(i + 1).padStart(2, "0")}</div>
-              </div>
               <div className="p-7">
                 <div className="flex items-start justify-between gap-4 mb-5">
                   <h3 className="font-serif text-2xl text-gold-shine leading-tight max-w-[12rem]">{s.name}</h3>
@@ -442,10 +436,9 @@ function TestimonialsSection() {
   );
 }
 
-function FeatureBadge({ icon, title, subtitle }: { icon: string; title: string; subtitle: string }) {
+function FeatureBadge({ title, subtitle }: { title: string; subtitle: string }) {
   return (
     <div className="flex items-start gap-3 p-4 rounded-lg border border-gold-500/15 bg-ink-900/40">
-      <div className="text-2xl">{icon}</div>
       <div>
         <div className="text-sm text-gold-100 font-medium">{title}</div>
         <div className="text-[11px] text-gold-100/50">{subtitle}</div>
