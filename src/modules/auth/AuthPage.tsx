@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import { Logo, LogoMark } from "../../components/Logo";
 import { Button, Input, Label, Ornament, PasswordInput } from "../../components/ui";
 import { authService } from "../../services/auth";
@@ -187,8 +187,8 @@ export function RegisterPage({ navigate }: { navigate: (p: string) => void }) {
 function AuthLayout({ children, navigate }: { children: React.ReactNode; navigate: (p: string) => void }) {
   return (
     <div className="min-h-screen bg-ink-950 relative overflow-hidden">
-      <div className="absolute -top-40 -right-40 w-[600px] h-[600px] bg-gold-600/15 rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute -bottom-40 -left-40 w-[500px] h-[500px] bg-gold-500/10 rounded-full blur-[100px] pointer-events-none" />
+      <div className="absolute -top-40 -right-40 w-150 h-150 bg-gold-600/15 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute -bottom-40 -left-40 w-125 h-125 bg-gold-500/10 rounded-full blur-[100px] pointer-events-none" />
 
       <div className="absolute top-0 inset-x-0 z-30 flex items-center justify-between px-4 sm:px-6 py-4">
         <button onClick={() => navigate(ROUTES.home)} className="no-min hover:opacity-80 transition flex items-center gap-2 text-gold-200/80 hover:text-gold-100">
@@ -205,8 +205,8 @@ function AuthLayout({ children, navigate }: { children: React.ReactNode; navigat
       <div className="grid lg:grid-cols-2 min-h-screen relative">
         <div className="hidden lg:flex relative overflow-hidden items-end">
           <img src="/images/doctor-login.png" alt="Estandarte Dental Clinic doctor" className="absolute inset-0 w-full h-full object-cover" />
-          <div className="absolute inset-0 bg-gradient-to-t from-ink-950 via-ink-950/40 to-ink-950/30" />
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent to-ink-950/70" />
+          <div className="absolute inset-0 bg-linear-to-t from-ink-950 via-ink-950/40 to-ink-950/30" />
+          <div className="absolute inset-0 bg-linear-to-r from-transparent to-ink-950/70" />
           <div className="relative z-10 p-10 xl:p-16 max-w-xl">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full glass mb-6">
               <span className="h-1.5 w-1.5 rounded-full bg-gold-400" />
@@ -230,7 +230,7 @@ function AuthLayout({ children, navigate }: { children: React.ReactNode; navigat
         <div className="relative flex items-center justify-center p-6 sm:p-10 pt-24 lg:pt-10">
           <div className="absolute inset-0 lg:hidden">
             <img src="/images/clinic-interior.jpg" alt="" className="w-full h-full object-cover opacity-20" />
-            <div className="absolute inset-0 bg-gradient-to-br from-ink-950/95 via-ink-950/85 to-ink-950/95" />
+            <div className="absolute inset-0 bg-linear-to-br from-ink-950/95 via-ink-950/85 to-ink-950/95" />
           </div>
           <div className="relative w-full flex justify-center">{children}</div>
         </div>

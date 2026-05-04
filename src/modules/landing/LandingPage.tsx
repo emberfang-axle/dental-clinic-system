@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Public landing page — STRICTLY isolated from any dashboard logic.
  * Visible to anyone, no authentication required.
  */
@@ -41,8 +41,8 @@ export function LandingPage({ navigate }: { navigate: (p: string) => void }) {
 
   return (
     <div className="min-h-screen bg-ink-950 text-gold-50 relative">
-      <div className="fixed top-0 right-0 w-[600px] h-[600px] bg-gold-600/10 rounded-full blur-[120px] pointer-events-none" />
-      <div className="fixed bottom-0 left-0 w-[500px] h-[500px] bg-gold-500/8 rounded-full blur-[100px] pointer-events-none" />
+      <div className="fixed top-0 right-0 w-150 h-150 bg-gold-600/10 rounded-full blur-[120px] pointer-events-none" />
+      <div className="fixed bottom-0 left-0 w-125 h-125 bg-gold-500/8 rounded-full blur-[100px] pointer-events-none" />
 
       {/* Nav */}
       <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${scrolled ? "bg-ink-950/85 backdrop-blur-xl border-b border-gold-soft py-2" : "bg-transparent py-4"}`}>
@@ -101,8 +101,8 @@ export function LandingPage({ navigate }: { navigate: (p: string) => void }) {
       <section id="home" className="relative min-h-[70vh] flex items-center overflow-hidden pt-20">
         <div className="absolute inset-0">
           <img src="/images/hero-dental.jpg" alt="" className="absolute inset-0 w-full h-full opacity-35" style={{objectFit:"contain",objectPosition:"center center"}} />
-          <div className="absolute inset-0 bg-gradient-to-r from-ink-950 via-ink-950/80 to-ink-950/30" />
-          <div className="absolute inset-0 bg-gradient-to-t from-ink-950 via-transparent to-ink-950/60" />
+          <div className="absolute inset-0 bg-linear-to-r from-ink-950 via-ink-950/80 to-ink-950/30" />
+          <div className="absolute inset-0 bg-linear-to-t from-ink-950 via-transparent to-ink-950/60" />
           <div className="absolute inset-0 pattern-grid opacity-40" />
         </div>
 
@@ -188,8 +188,8 @@ export function LandingPage({ navigate }: { navigate: (p: string) => void }) {
           <div className="relative group">
             <div className="absolute inset-0 bg-gold-gradient rounded-2xl blur-2xl opacity-20 group-hover:opacity-30 transition" />
             <div className="relative rounded-2xl overflow-hidden border border-gold-500/30 shadow-luxe">
-              <img src="/images/clinic-interior.jpg" alt="Clinic interior" className="w-full h-[480px] object-cover transition-transform duration-700 group-hover:scale-105" />
-              <div className="absolute inset-0 bg-gradient-to-t from-ink-950/80 via-transparent to-transparent" />
+              <img src="/images/clinic-interior.jpg" alt="Clinic interior" className="w-full h-120 object-cover transition-transform duration-700 group-hover:scale-105" />
+              <div className="absolute inset-0 bg-linear-to-t from-ink-950/80 via-transparent to-transparent" />
               <div className="absolute bottom-6 left-6 right-6">
                 <div className="text-[10px] uppercase tracking-[0.3em] text-gold-300 mb-2">Our Sanctuary</div>
                 <div className="font-serif text-2xl text-gold-50">A space designed for comfort.</div>
@@ -265,13 +265,13 @@ export function LandingPage({ navigate }: { navigate: (p: string) => void }) {
             <div key={s.id} className="group relative rounded-xl overflow-hidden glass hover:border-gold-400/50 transition-all duration-500 hover:-translate-y-2 hover:shadow-luxe">
               <div className="p-7">
                 <div className="flex items-start justify-between gap-4 mb-5">
-                  <h3 className="font-serif text-2xl text-gold-shine leading-tight max-w-[12rem]">{s.name}</h3>
+                  <h3 className="font-serif text-2xl text-gold-shine leading-tight max-w-48">{s.name}</h3>
                   <div className="text-right shrink-0">
                     <div className="text-[9px] uppercase tracking-[0.25em] text-gold-300/60 mb-0.5">Duration</div>
                     <div className="text-sm text-gold-200">{s.duration} min</div>
                   </div>
                 </div>
-                <p className="text-sm text-gold-100/55 leading-relaxed mb-5 min-h-[40px]">{s.description}</p>
+                <p className="text-sm text-gold-100/55 leading-relaxed mb-5 min-h-10">{s.description}</p>
                 <div className="flex items-end justify-between pt-4 border-t border-gold-500/15">
                   <div>
                     <div className="text-[9px] uppercase tracking-[0.25em] text-gold-300/60 mb-0.5">Starting at</div>
@@ -297,13 +297,13 @@ export function LandingPage({ navigate }: { navigate: (p: string) => void }) {
 
       {/* DOCTOR FEATURE */}
       <section className="py-24 md:py-32 px-6 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-gold-900/10 to-transparent" />
+        <div className="absolute inset-0 bg-linear-to-b from-transparent via-gold-900/10 to-transparent" />
         <div className="max-w-6xl mx-auto relative grid lg:grid-cols-5 gap-12 items-center">
           <div className="lg:col-span-2 relative">
             <div className="absolute inset-0 bg-gold-gradient rounded-2xl blur-3xl opacity-20" />
-            <div className="relative rounded-2xl overflow-hidden border border-gold-500/30 shadow-luxe aspect-[4/5]">
+            <div className="relative rounded-2xl overflow-hidden border border-gold-500/30 shadow-luxe aspect-4/5">
               <img src="/images/doctor-portrait.png" alt="Lead dentist" className="w-full h-full object-cover" />
-              <div className="absolute inset-0 bg-gradient-to-t from-ink-950/90 via-transparent to-transparent" />
+              <div className="absolute inset-0 bg-linear-to-t from-ink-950/90 via-transparent to-transparent" />
               <div className="absolute bottom-6 left-6 right-6">
                 <div className="text-[10px] uppercase tracking-[0.3em] text-gold-300 mb-1">Owner & Lead Dentist</div>
                 <div className="font-serif text-2xl text-gold-50">Dr. Mary Cris Estandarte</div>
@@ -353,7 +353,7 @@ export function LandingPage({ navigate }: { navigate: (p: string) => void }) {
           <div className="absolute inset-0 bg-gold-gradient rounded-3xl blur-3xl opacity-20" />
           <div className="relative rounded-3xl glass-strong border border-gold-500/30 p-12 md:p-20 text-center shadow-luxe overflow-hidden">
             <div className="absolute inset-0 pattern-gold opacity-40" />
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-px h-16 bg-gradient-to-b from-gold-400 to-transparent" />
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-px h-16 bg-linear-to-b from-gold-400 to-transparent" />
             <div className="relative">
               <Ornament className="w-32 h-3 mx-auto mb-8" />
               <h2 className="font-serif text-4xl md:text-6xl font-light text-gold-shine leading-tight">
@@ -449,7 +449,7 @@ function FeatureBadge({ title, subtitle }: { title: string; subtitle: string }) 
 
 function ContactCard({ label, primary, secondary }: { label: string; primary: string; secondary: string }) {
   return (
-    <Card hover className="text-center !p-8">
+    <Card hover className="text-center p-8!">
       <div className="text-[10px] uppercase tracking-[0.3em] text-gold-300/70 mb-2 font-semibold">{label}</div>
       <div className="font-serif text-xl text-gold-shine mb-1">{primary}</div>
       <div className="text-xs text-gold-100/55">{secondary}</div>
