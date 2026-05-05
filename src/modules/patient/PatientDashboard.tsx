@@ -58,7 +58,9 @@ function PatientPaymentCenter() {
     .filter((a) => a.patientId === user!.id && a.status !== "cancelled")
     .sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
   const [refs, setRefs] = useState<Record<string, string>>({});
+  const [screenshots, setScreenshots] = useState<Record<string, string>>({});
   const [uploading, setUploading] = useState<Record<string, number | null>>({});
+  const [submitting, setSubmitting] = useState<Record<string, boolean>>({});
 
   const handleUpload = async (appointmentId: string, file: File) => {
     setUploading((p) => ({ ...p, [appointmentId]: 0 }));
@@ -68,9 +70,21 @@ function PatientPaymentCenter() {
         gcashScreenshotPath(appointmentId, file.name),
         (pct) => setUploading((p) => ({ ...p, [appointmentId]: pct }))
       );
-      await paymentsService.saveProof(appointmentId, refs[appointmentId] || "", url, user!.name);
+      setScreenshots((p) => ({ ...p, [appointmentId]: url }));
     } finally {
       setUploading((p) => ({ ...p, [appointmentId]: null }));
+    }
+  };
+
+  const handleSubmit = async (a: Appointment) => {
+    const ref = refs[a.id] ?? a.gcashRef ?? "";
+    const screenshot = screenshots[a.id] ?? a.paymentScreenshotUrl;
+    if (!ref && !screenshot) return;
+    setSubmitting((p) => ({ ...p, [a.id]: true }));
+    try {
+      await paymentsService.saveProof(a.id, ref, screenshot, user!.name);
+    } finally {
+      setSubmitting((p) => ({ ...p, [a.id]: false }));
     }
   };
 
@@ -131,7 +145,7 @@ function PatientPaymentCenter() {
                   </div>
                 )}
 
-                {a.paymentMethod === "gcash" && a.paymentStatus === "pending_verification" && (
+                {a.paymentMethod === "gcash" && (a.paymentStatus === "unpaid" || a.paymentStatus === "pending_verification") && (
                   <div className="space-y-4">
                     <div className="rounded-xl border border-yellow-500/20 bg-yellow-500/5 p-3 text-xs text-gold-100/70">
                       Send ₱{a.price.toLocaleString()} to GCash <span className="font-semibold text-gold-300">{settings.gcashNumber}</span>, then submit your reference number and screenshot below.
@@ -146,7 +160,7 @@ function PatientPaymentCenter() {
                         />
                       </div>
                       <div>
-                        <Label>Upload Screenshot</Label>
+                        <Label>Upload Screenshot <span className="text-gold-100/40 text-xs">(optional)</span></Label>
                         <input
                           type="file" accept="image/*"
                           disabled={!!uploading[a.id]}
@@ -164,13 +178,13 @@ function PatientPaymentCenter() {
                       </div>
                       <div className="md:col-span-2 flex flex-wrap items-center gap-3">
                         <Button
-                          disabled={!!uploading[a.id]}
-                          onClick={() => paymentsService.saveProof(a.id, refs[a.id] || a.gcashRef || "", a.paymentScreenshotUrl, user!.name)}
+                          disabled={!!uploading[a.id] || !!submitting[a.id] || (!(refs[a.id] ?? a.gcashRef) && !(screenshots[a.id] ?? a.paymentScreenshotUrl))}
+                          onClick={() => handleSubmit(a)}
                         >
-                          Submit Reference
+                          {submitting[a.id] ? "Submitting…" : "Submit Reference"}
                         </Button>
-                        {a.paymentScreenshotUrl && (
-                          <a href={a.paymentScreenshotUrl} target="_blank" rel="noreferrer" className="text-sm text-gold-300 underline">
+                        {(screenshots[a.id] ?? a.paymentScreenshotUrl) && (
+                          <a href={screenshots[a.id] ?? a.paymentScreenshotUrl} target="_blank" rel="noreferrer" className="text-sm text-gold-300 underline">
                             View submitted screenshot
                           </a>
                         )}
@@ -185,7 +199,7 @@ function PatientPaymentCenter() {
                   </div>
                 )}
 
-                {a.paymentStatus === "unpaid" && a.status === "completed" && (
+                {a.paymentStatus === "unpaid" && a.status === "completed" && a.paymentMethod === "cash" && (
                   <div className="rounded-xl border border-gold-500/15 bg-ink-900/55 p-4 text-sm text-gold-100/50">
                     Awaiting staff to create your bill.
                   </div>
@@ -274,6 +288,8 @@ function FeedbackPage() {
   const [text, setText] = useState("");
   const [appointmentId, setAppointmentId] = useState(completed[0]?.id || "");
   const [sent, setSent] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState("");
 
   return (
     <div className="grid xl:grid-cols-[0.9fr_1.1fr] gap-6">
@@ -304,28 +320,40 @@ function FeedbackPage() {
           <Label>Comments</Label>
           <Textarea
             value={text}
-            onChange={(e) => setText(e.target.value)}
+            onChange={(e) => { setText(e.target.value); setFormError(""); }}
             rows={6}
             placeholder="Tell us about the service quality, comfort, staff support, or suggestions."
           />
+          {formError && <p className="mt-1 text-xs text-red-400">{formError}</p>}
         </div>
 
         <Button
           className="mt-5"
+          disabled={submitting}
           onClick={async () => {
-            if (!text.trim()) return;
-            await feedbackService.submit({
-              userId: user!.id,
-              userName: user!.name,
-              stars,
-              text,
-              appointmentId: appointmentId || undefined,
-            });
-            setSent(true);
-            setText("");
+            if (submitting) return;
+            if (!text.trim()) { setFormError("Please write a comment before submitting."); return; }
+            if (text.trim().length < 10) { setFormError("Comment must be at least 10 characters."); return; }
+            setSubmitting(true);
+            setFormError("");
+            try {
+              await feedbackService.submit({
+                userId: user!.id,
+                userName: user!.name,
+                stars,
+                text: text.trim(),
+                appointmentId: appointmentId || undefined,
+              });
+              setSent(true);
+              setText("");
+              setStars(5);
+              setAppointmentId(completed[0]?.id || "");
+            } finally {
+              setSubmitting(false);
+            }
           }}
         >
-          Submit Feedback
+          {submitting ? "Submitting…" : "Submit Feedback"}
         </Button>
         {sent && <p className="mt-3 text-emerald-400 text-sm">✓ Thank you for your feedback.</p>}
       </Card>

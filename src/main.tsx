@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import "./index.css";
 import App from "./App";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { ToastContainer } from "./components/ToastContainer";
 import { bootstrapRealtime } from "./services/bootstrap";
 import { useStore } from "./store/store";
 import { authService } from "./services/auth";
@@ -53,6 +54,7 @@ createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <ErrorBoundary>
       <Root />
+      <ToastContainer />
     </ErrorBoundary>
   </StrictMode>
 );

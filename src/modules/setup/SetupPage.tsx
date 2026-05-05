@@ -17,8 +17,8 @@ const ACCOUNTS: Array<{ email: string; password: string; name: string; role: "do
     phone: "09107614956",
   },
   {
-    email: "staff@estandarte.ph",
-    password: "Staff2022!",
+    email: "staff@gmail.com",
+    password: "staff123",
     name: "Clinic Staff",
     role: "staff",
     phone: "09123456789",
@@ -51,7 +51,7 @@ export function SetupPage({ navigate }: { navigate: (p: string) => void }) {
           if (e.code === "auth/email-already-in-use") {
             // Account exists — sign in with current password to get UID,
             // trying common passwords in case it was set differently before.
-            const attempts = [acct.password, "Estandarte2022!", "Staff2022!", "demo"];
+            const attempts = [acct.password, "staff123", "Estandarte2022!", "Staff2022!", "demo"];
             let signedIn = false;
             for (const pwd of attempts) {
               try {

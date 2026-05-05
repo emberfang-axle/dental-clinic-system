@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Multi-step appointment booking flow (4 steps).
  * Available to authenticated patients.
  */
@@ -52,7 +52,15 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
     .filter((a) => a.date === date && a.status !== "cancelled")
     .map((a) => a.time);
 
-  function next() { setStep((s) => Math.min(s + 1, 4)); }
+  function next() {
+    setBookingError("");
+    if (step === 3) {
+      if (!time) { setBookingError("Please select a time slot."); return; }
+      const today = new Date().toISOString().slice(0, 10);
+      if (date < today) { setBookingError("Please select a future date."); return; }
+    }
+    setStep((s) => Math.min(s + 1, 4));
+  }
   function back() { setStep((s) => Math.max(s - 1, 1)); }
 
   async function confirm() {
@@ -269,17 +277,19 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
             </div>
           )}
 
-          <div className="mt-8 pt-6 border-t border-gold-500/15 flex justify-between gap-3">
-            <Button variant="ghost" onClick={back} disabled={step === 1}>← Back</Button>
-            {step < 4 ? (
-              <Button onClick={next} disabled={step === 3 && !time}>Continue →</Button>
-            ) : (
-              <Button onClick={confirm} disabled={!time || booking}>{booking ? "Booking…" : "Confirm Appointment ✓"}</Button>
+          <div className="mt-8 pt-6 border-t border-gold-500/15 flex flex-col gap-3">
+            {bookingError && (
+              <p className="text-sm text-red-300 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">{bookingError}</p>
             )}
+            <div className="flex justify-between gap-3">
+              <Button variant="ghost" onClick={back} disabled={step === 1}>← Back</Button>
+              {step < 4 ? (
+                <Button onClick={next}>Continue →</Button>
+              ) : (
+                <Button onClick={confirm} disabled={!time || booking}>{booking ? "Booking…" : "Confirm Appointment ✓"}</Button>
+              )}
+            </div>
           </div>
-          {bookingError && (
-            <p className="mt-3 text-sm text-red-300">{bookingError}</p>
-          )}
         </div>
       </div>
     </div>

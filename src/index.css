@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Playfair+Display:ital,wght@0,400;0,500;1,400;1,500&family=Inter:wght@300;400;500;600;700&display=swap');
 @import "tailwindcss";
 
 @theme {
@@ -19,12 +19,17 @@
   --color-ink-700: #1a1814;
   --color-ink-600: #25221c;
 
-  --font-serif: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-serif: 'Cormorant Garamond', 'Georgia', ui-serif, serif;
   --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-script: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-script: 'Playfair Display', 'Georgia', ui-serif, serif;
 }
 
 * { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+
+select option {
+  background-color: #0b0a08;
+  color: #faf0c8;
+}
 
 html, body, #root {
   background: #060504;

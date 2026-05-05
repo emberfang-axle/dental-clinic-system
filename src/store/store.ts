@@ -1,4 +1,4 @@
-﻿import { useSyncExternalStore } from "react";
+import { useSyncExternalStore } from "react";
 import type {
   Appointment,
   AuditLog,
@@ -10,6 +10,12 @@ import type {
   User,
   Announcement,
 } from "../shared/types";
+
+export interface ToastEntry {
+  id: string;
+  message: string;
+  kind: "success" | "error" | "info";
+}
 
 export interface AppState {
   authReady: boolean;
@@ -23,6 +29,7 @@ export interface AppState {
   settings: ClinicSettings;
   staffPermissions: StaffPermission[];
   announcements: Announcement[];
+  toasts: ToastEntry[];
 }
 
 let state: AppState = {
@@ -37,6 +44,7 @@ let state: AppState = {
   settings: {} as ClinicSettings,
   staffPermissions: [],
   announcements: [],
+  toasts: [],
 };
 
 type Listener = () => void;
@@ -58,7 +66,7 @@ export function setState(partial: Partial<AppState>) {
 
 export function resetState() {
   state = {
-  authReady: false,
+    authReady: false,
     user: null,
     users: [],
     services: [],
@@ -69,11 +77,20 @@ export function resetState() {
     settings: {} as ClinicSettings,
     staffPermissions: [],
     announcements: [],
+    toasts: [],
   };
   listeners.forEach((l) => l());
+}
+
+let toastSeq = 0;
+export function showToast(message: string, kind: ToastEntry["kind"] = "info", durationMs = 4000) {
+  const id = `toast_${++toastSeq}`;
+  setState({ toasts: [...state.toasts, { id, message, kind }] });
+  setTimeout(() => {
+    setState({ toasts: state.toasts.filter((t) => t.id !== id) });
+  }, durationMs);
 }
 
 export function useStore() {
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }
-

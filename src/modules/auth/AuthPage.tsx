@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from "react";
+﻿﻿import { useState, useEffect } from "react";
 import { Logo, LogoMark } from "../../components/Logo";
 import { Button, Input, Label, Ornament, PasswordInput } from "../../components/ui";
 import { authService } from "../../services/auth";
@@ -117,8 +117,13 @@ export function RegisterPage({ navigate }: { navigate: (p: string) => void }) {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
-    setLoading(true);
 
+    if (!name.trim()) { setError("Full name is required."); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setError("Enter a valid email address."); return; }
+    if (!/^09\d{9}$/.test(phone.replace(/\s/g, ""))) { setError("Phone must be a valid PH mobile number (e.g. 09xx xxx xxxx)."); return; }
+    if (password.length < 6) { setError("Password must be at least 6 characters."); return; }
+
+    setLoading(true);
     try {
       const u = await authService.register(name, email, phone, password);
       navigate(dashboardPathFor(u.role));

@@ -16,7 +16,7 @@ import { OfflineBanner } from "./components/OfflineBanner";
 
 export default function App() {
   const [path, setPath] = useState(() => window.location.hash.replace(/^#/, "") || ROUTES.home);
-  const { user } = useStore();
+  const { user, authReady } = useStore();
 
   useEffect(() => {
     const onHash = () => setPath(window.location.hash.replace(/^#/, "") || ROUTES.home);
@@ -30,42 +30,38 @@ export default function App() {
     window.scrollTo({ top: 0 });
   }
 
+  // Wait for Firebase to restore session before routing
+  if (!authReady) return null;
+
   const role = user?.role;
   const isDashboard = path.startsWith(ROUTES.dashboard);
 
-  if (path === ROUTES.dashboard) {
-    setTimeout(() => navigate(user ? dashboardPathFor(role!) : ROUTES.login), 0);
-    return null;
-  }
-  if (isDashboard && !user) {
-    setTimeout(() => navigate(ROUTES.login), 0);
-    return null;
-  }
-  if (isDashboard && user && !canAccessRoute(path, role)) {
-    setTimeout(() => navigate(dashboardPathFor(role!)), 0);
-    return null;
-  }
+  // Resolve redirect target synchronously
+  let redirect: string | null = null;
+  if (path === ROUTES.dashboard)          redirect = user ? dashboardPathFor(role!) : ROUTES.login;
+  else if (isDashboard && !user)          redirect = ROUTES.login;
+  else if (isDashboard && !canAccessRoute(path, role)) redirect = dashboardPathFor(role!);
 
-  function page() {
-    switch (path) {
-      case ROUTES.home:             return <LandingPage navigate={navigate} />;
-      case ROUTES.login:            return <LoginPage navigate={navigate} />;
-      case ROUTES.adminLogin:       return <AdminLoginPage navigate={navigate} />;
-      case ROUTES.register:         return <RegisterPage navigate={navigate} />;
-      case ROUTES.book:             return <BookAppointmentPage navigate={navigate} />;
-      case "/setup":                return <SetupPage navigate={navigate} />;
-      case ROUTES.adminDashboard:   return <AdminDashboard navigate={navigate} />;
-      case ROUTES.doctorDashboard:  return <DoctorDashboard navigate={navigate} />;
-      case ROUTES.staffDashboard:   return <StaffDashboard navigate={navigate} />;
-      case ROUTES.patientDashboard: return <PatientDashboard navigate={navigate} />;
-      default:                      return <NotFoundPage navigate={navigate} />;
-    }
-  }
+  useEffect(() => { if (redirect) navigate(redirect); }, [redirect]);
+  if (redirect) return null;
+
+  const PAGES: Record<string, JSX.Element> = {
+    [ROUTES.home]:             <LandingPage navigate={navigate} />,
+    [ROUTES.login]:            <LoginPage navigate={navigate} />,
+    [ROUTES.adminLogin]:       <AdminLoginPage navigate={navigate} />,
+    [ROUTES.register]:         <RegisterPage navigate={navigate} />,
+    [ROUTES.book]:             <BookAppointmentPage navigate={navigate} />,
+    "/setup":                  <SetupPage navigate={navigate} />,
+    [ROUTES.adminDashboard]:   <AdminDashboard navigate={navigate} />,
+    [ROUTES.doctorDashboard]:  <DoctorDashboard navigate={navigate} />,
+    [ROUTES.staffDashboard]:   <StaffDashboard navigate={navigate} />,
+    [ROUTES.patientDashboard]: <PatientDashboard navigate={navigate} />,
+  };
 
   return (
     <>
       <OfflineBanner />
-      {page()}
+      {PAGES[path] ?? <NotFoundPage navigate={navigate} />}
     </>
   );
 }

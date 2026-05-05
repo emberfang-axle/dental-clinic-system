@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Public landing page — STRICTLY isolated from any dashboard logic.
  * Visible to anyone, no authentication required.
  */
@@ -10,27 +10,28 @@ import { useStore } from "../../store/store";
 import { CLINIC, ROUTES } from "../../shared/constants";
 import { dashboardPathFor } from "../../shared/helpers";
 
-const navLinks = [
-  { l: "Home", h: "#home" },
-  { l: "About", h: "#about" },
-  { l: "Services", h: "#services" },
-  { l: "Why Us", h: "#why" },
-  { l: "Contact", h: "#contact" },
+const NAV_LINKS = [
+  { label: "Home",     id: "home" },
+  { label: "About",    id: "about" },
+  { label: "Services", id: "services" },
+  { label: "Why Us",   id: "why" },
+  { label: "Contact",  id: "contact" },
 ];
+
+function scrollTo(id: string) {
+  document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
+}
 
 export function LandingPage({ navigate }: { navigate: (p: string) => void }) {
   const { services, user } = useStore();
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenu, setMobileMenu] = useState(false);
   const [showAllServices, setShowAllServices] = useState(false);
-  const servicesPreviewCount = 3;
-  const displayedServices = showAllServices ? services : services.slice(0, servicesPreviewCount);
+  const displayedServices = showAllServices ? services : services.slice(0, 3);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
-    const onResize = () => {
-      if (window.innerWidth >= 1024) setMobileMenu(false);
-    };
+    const onResize = () => { if (window.innerWidth >= 1024) setMobileMenu(false); };
     window.addEventListener("scroll", onScroll);
     window.addEventListener("resize", onResize);
     return () => {
@@ -51,9 +52,9 @@ export function LandingPage({ navigate }: { navigate: (p: string) => void }) {
             <Logo size={42} />
           </button>
           <nav className="hidden lg:flex items-center gap-9 text-[12px] uppercase tracking-[0.18em] text-gold-100/70 font-semibold">
-            {navLinks.map((i) => (
-              <a key={i.l} href={i.h} className="hover:text-gold-300 transition relative group whitespace-nowrap">
-                {i.l}
+            {NAV_LINKS.map(({ label, id }) => (
+              <a key={id} onClick={() => scrollTo(id)} className="hover:text-gold-300 transition relative group whitespace-nowrap cursor-pointer">
+                {label}
                 <span className="absolute -bottom-1 left-0 w-0 h-px bg-gold-400 transition-all group-hover:w-full" />
               </a>
             ))}
@@ -61,9 +62,7 @@ export function LandingPage({ navigate }: { navigate: (p: string) => void }) {
           <div className="flex items-center gap-2">
             {user ? (
               <>
-                <Button variant="outline" size="sm" onClick={() => navigate(dashboardPathFor(user.role))}>
-                  My Dashboard
-                </Button>
+                <Button variant="outline" size="sm" onClick={() => navigate(dashboardPathFor(user.role))}>My Dashboard</Button>
                 <Button size="sm" onClick={() => navigate(ROUTES.book)} className="hidden sm:inline-flex">Book Now</Button>
               </>
             ) : (
@@ -87,9 +86,9 @@ export function LandingPage({ navigate }: { navigate: (p: string) => void }) {
         {mobileMenu && (
           <div className="lg:hidden border-t border-gold-soft bg-ink-950/95 backdrop-blur-xl">
             <div className="max-w-7xl mx-auto px-6 py-4 flex flex-col gap-3 text-sm">
-              {navLinks.map((item) => (
-                <a key={item.l} href={item.h} onClick={() => setMobileMenu(false)} className="text-gold-100/80 hover:text-gold-300 py-1.5 uppercase tracking-[0.18em] text-[11px] font-semibold">
-                  {item.l}
+              {NAV_LINKS.map(({ label, id }) => (
+                <a key={id} onClick={() => { setMobileMenu(false); scrollTo(id); }} className="text-gold-100/80 hover:text-gold-300 py-1.5 uppercase tracking-[0.18em] text-[11px] font-semibold cursor-pointer">
+                  {label}
                 </a>
               ))}
             </div>
@@ -100,7 +99,7 @@ export function LandingPage({ navigate }: { navigate: (p: string) => void }) {
       {/* HERO */}
       <section id="home" className="relative min-h-[70vh] flex items-center overflow-hidden pt-20">
         <div className="absolute inset-0">
-          <img src="/images/hero-dental.jpg" alt="" className="absolute inset-0 w-full h-full opacity-35" style={{objectFit:"contain",objectPosition:"center center"}} />
+          <img src="/images/hero-dental.jpg" alt="" className="absolute inset-0 w-full h-full opacity-35" style={{ objectFit: "contain", objectPosition: "center center" }} />
           <div className="absolute inset-0 bg-linear-to-r from-ink-950 via-ink-950/80 to-ink-950/30" />
           <div className="absolute inset-0 bg-linear-to-t from-ink-950 via-transparent to-ink-950/60" />
           <div className="absolute inset-0 pattern-grid opacity-40" />
@@ -108,30 +107,19 @@ export function LandingPage({ navigate }: { navigate: (p: string) => void }) {
 
         <div className="relative max-w-7xl mx-auto px-6 py-20 grid lg:grid-cols-12 gap-12 items-center w-full">
           <div className="lg:col-span-7 fade-up">
-            <div className="inline-flex items-center gap-3 px-4 py-2 rounded-full glass mb-8">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-gold-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-gold-400" />
-              </span>
-              <span className="text-[11px] uppercase tracking-[0.25em] text-gold-200/90 font-medium">{CLINIC.address}</span>
-            </div>
-
-            <h1 className="font-serif font-light text-[2.75rem] sm:text-6xl lg:text-7xl xl:text-8xl leading-[0.95] tracking-tight">
+            <p className="text-[11px] uppercase tracking-[0.15em] sm:tracking-[0.25em] text-gold-200/90 font-medium mb-8">{CLINIC.address}</p>
+            <h1 className="font-serif font-light text-[2rem] sm:text-4xl lg:text-5xl xl:text-6xl leading-[0.95] tracking-tight">
               <span className="block text-gold-50/95">A smile that</span>
               <span className="block text-gold-shine font-script italic font-normal mt-1">speaks luxury.</span>
             </h1>
-
             <p className="mt-8 max-w-xl text-base md:text-lg text-gold-100/60 font-light leading-relaxed">
               Estandarte Dental Clinic delivers refined, world-class dental care in the heart of Compostela.
               Trusted for over four years, modernized for the way you live today.
             </p>
-
             <div className="mt-10 flex flex-wrap gap-4">
               <Button size="lg" onClick={() => navigate(ROUTES.book)}>
                 Book Appointment
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <path d="M5 12h14M13 5l7 7-7 7" />
-                </svg>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14M13 5l7 7-7 7" /></svg>
               </Button>
               <a href={`tel:+63${CLINIC.phone.replace(/\D/g, "").slice(1)}`}>
                 <Button size="lg" variant="outline">Call Us</Button>
@@ -159,10 +147,10 @@ export function LandingPage({ navigate }: { navigate: (p: string) => void }) {
                 <LogoMark size={160} />
               </div>
               <div className="absolute -top-4 -right-4 glass-strong px-4 py-2.5 rounded-full text-xs text-gold-100 font-medium float-slow shadow-luxe" style={{ animationDelay: "1s" }}>
-                ✨ Premium Care
+                Premium Care
               </div>
               <div className="absolute -bottom-4 -left-4 glass-strong px-4 py-2.5 rounded-full text-xs text-gold-100 font-medium float-slow shadow-luxe" style={{ animationDelay: "2s" }}>
-                🏆 Trusted Since {CLINIC.yearFounded}
+                Trusted Since {CLINIC.yearFounded}
               </div>
             </div>
           </div>
@@ -228,7 +216,7 @@ export function LandingPage({ navigate }: { navigate: (p: string) => void }) {
               <p className="text-[10px] uppercase tracking-[0.4em] text-gold-400 font-semibold">Why Choose Us</p>
               <span className="h-px w-8 bg-gold-500/50" />
             </div>
-            <h2 className="font-serif text-4xl md:text-5xl lg:text-6xl font-light text-gold-shine leading-[1.1]">
+            <h2 className="font-serif text-3xl md:text-4xl lg:text-5xl font-light text-gold-shine leading-[1.1]">
               The Estandarte <span className="font-script italic">difference.</span>
             </h2>
           </div>
@@ -286,16 +274,16 @@ export function LandingPage({ navigate }: { navigate: (p: string) => void }) {
           ))}
         </div>
         <div className="mt-8 flex flex-wrap justify-center gap-3">
-          {services.length > servicesPreviewCount && (
-            <Button variant="outline" onClick={() => setShowAllServices((prev) => !prev)}>
-              {showAllServices ? "Show Less Services" : "View All Services"}
+          {services.length > 3 && (
+            <Button variant="outline" onClick={() => setShowAllServices((v) => !v)}>
+              {showAllServices ? "Show Less" : "View All Services"}
             </Button>
           )}
           <Button onClick={() => navigate(ROUTES.book)}>Book Appointment</Button>
         </div>
       </Section>
 
-      {/* DOCTOR FEATURE */}
+      {/* DOCTOR */}
       <section className="py-24 md:py-32 px-6 relative overflow-hidden">
         <div className="absolute inset-0 bg-linear-to-b from-transparent via-gold-900/10 to-transparent" />
         <div className="max-w-6xl mx-auto relative grid lg:grid-cols-5 gap-12 items-center">
@@ -314,7 +302,7 @@ export function LandingPage({ navigate }: { navigate: (p: string) => void }) {
           <div className="lg:col-span-3 space-y-6">
             <Ornament className="w-24 h-3" />
             <p className="text-[10px] uppercase tracking-[0.4em] text-gold-400 font-semibold">Meet The Doctor</p>
-            <h2 className="font-serif text-4xl md:text-5xl font-light text-gold-shine leading-[1.1]">
+            <h2 className="font-serif text-3xl md:text-4xl font-light text-gold-shine leading-[1.1]">
               Care led by a <span className="font-script italic">trusted hand.</span>
             </h2>
             <p className="text-gold-100/70 text-lg leading-relaxed font-light">
@@ -326,7 +314,6 @@ export function LandingPage({ navigate }: { navigate: (p: string) => void }) {
         </div>
       </section>
 
-      {/* TESTIMONIALS — live from patient feedback */}
       <TestimonialsSection />
 
       {/* CONTACT */}
@@ -338,7 +325,6 @@ export function LandingPage({ navigate }: { navigate: (p: string) => void }) {
         </div>
         <div className="text-center">
           <a href={CLINIC.facebookUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-3 px-6 py-3 rounded-full glass hover:border-gold-400/50 transition group">
-            <span className="text-[10px] uppercase tracking-[0.3em] text-gold-300/70"></span>
             <span className="text-sm text-gold-100 group-hover:text-gold-300 transition">Follow our official Facebook page</span>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gold-400 group-hover:translate-x-1 transition">
               <path d="M5 12h14M13 5l7 7-7 7" />
@@ -356,7 +342,7 @@ export function LandingPage({ navigate }: { navigate: (p: string) => void }) {
             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-px h-16 bg-linear-to-b from-gold-400 to-transparent" />
             <div className="relative">
               <Ornament className="w-32 h-3 mx-auto mb-8" />
-              <h2 className="font-serif text-4xl md:text-6xl font-light text-gold-shine leading-tight">
+              <h2 className="font-serif text-3xl md:text-5xl font-light text-gold-shine leading-tight">
                 Ready for your <span className="font-script italic">next visit?</span>
               </h2>
               <p className="mt-6 text-gold-100/70 max-w-xl mx-auto text-lg font-light">
@@ -384,10 +370,9 @@ export function LandingPage({ navigate }: { navigate: (p: string) => void }) {
             <div>
               <div className="text-[10px] uppercase tracking-[0.3em] text-gold-300 font-semibold mb-4">Navigate</div>
               <ul className="space-y-2.5 text-sm text-gold-100/60">
-                <li><a href="#home" className="hover:text-gold-300 transition">Home</a></li>
-                <li><a href="#about" className="hover:text-gold-300 transition">About</a></li>
-                <li><a href="#services" className="hover:text-gold-300 transition">Services</a></li>
-                <li><a href="#contact" className="hover:text-gold-300 transition">Contact</a></li>
+                {NAV_LINKS.map(({ label, id }) => (
+                  <li key={id}><a onClick={() => scrollTo(id)} className="hover:text-gold-300 transition cursor-pointer">{label}</a></li>
+                ))}
               </ul>
             </div>
             <div>
@@ -413,14 +398,8 @@ export function LandingPage({ navigate }: { navigate: (p: string) => void }) {
 
 function TestimonialsSection() {
   const { feedbacks } = useStore();
-  // Show up to 6 most recent feedbacks with 4+ stars
-  const shown = [...feedbacks]
-    .filter((f) => f.stars >= 4)
-    .sort((a, b) => b.at.localeCompare(a.at))
-    .slice(0, 6);
-
+  const shown = [...feedbacks].filter((f) => f.stars >= 4).sort((a, b) => b.at.localeCompare(a.at)).slice(0, 6);
   if (shown.length === 0) return null;
-
   return (
     <Section id="testimonials" eyebrow="Patient Reviews" title={<>What our patients <span className="font-script italic">say.</span></>}>
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 stagger">
