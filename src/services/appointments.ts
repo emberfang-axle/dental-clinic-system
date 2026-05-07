@@ -1,7 +1,7 @@
 import type { Appointment } from "../shared/types";
 import { getSnapshot, setState, showToast } from "../store/store";
-import { updateDocTyped, deleteDocTyped, runTransaction, collection, doc, db } from "./firestore";
-import { getDocs, query, where } from "firebase/firestore";
+import { updateDocTyped, deleteDocTyped, collection, doc, db } from "./firestore";
+import { setDoc } from "firebase/firestore";
 import { calendarService } from "./calendar";
 import { notificationsService } from "./notifications";
 
@@ -33,45 +33,15 @@ export const appointmentsService = {
     if (calendarService.isSlotBlocked(input.date, input.time)) {
       throw new Error("Selected schedule is blocked in calendar.");
     }
+    if (this.isSlotTaken(input.date, input.time)) {
+      throw new Error("This time slot was just taken. Please pick another.");
+    }
 
-    // Atomic slot check + write via Firestore transaction to prevent race conditions
     const now = nowISO();
     const newRef = doc(collection(db, "appointments"));
+    const data = { ...input, id: newRef.id, createdAt: now, updatedAt: now };
 
-    await runTransaction(db, async (tx) => {
-      // Check for conflicting active appointments at the same slot
-      const conflictSnap = await getDocs(
-        query(collection(db, "appointments"),
-          where("date", "==", input.date),
-          where("time", "==", input.time),
-          where("status", "!=", "cancelled")
-        )
-      );
-      if (!conflictSnap.empty) {
-        throw new Error("This time slot was just taken. Please pick another.");
-      }
-
-      // Remove any duplicate pending bookings for same patient + service
-      const dupSnap = await getDocs(
-        query(collection(db, "appointments"),
-          where("patientId", "==", input.patientId),
-          where("serviceId", "==", input.serviceId),
-          where("status", "==", "pending")
-        )
-      );
-      dupSnap.docs.forEach((d) => tx.delete(d.ref));
-
-      tx.set(newRef, { ...input, id: newRef.id, createdAt: now, updatedAt: now });
-    });
-
-    // Remove local duplicates from store to match what transaction deleted
-    const snap0 = getSnapshot();
-    const localDups = snap0.appointments.filter(
-      (a) => a.patientId === input.patientId && a.serviceId === input.serviceId && a.status === "pending"
-    );
-    if (localDups.length > 0) {
-      setState({ appointments: snap0.appointments.filter((a) => !localDups.some((d) => d.id === a.id)) });
-    }
+    await setDoc(newRef, data);
 
     const calendarEventId = await calendarService.createBookingEvent({
       patientName: input.patientName, serviceName: input.serviceName,
@@ -81,8 +51,7 @@ export const appointmentsService = {
       await updateDocTyped("appointments", newRef.id, { calendarEventId } as any);
     }
 
-    const ap: Appointment = { ...input, id: newRef.id, calendarEventId, createdAt: now, updatedAt: now };
-    // Do NOT optimistically push to store — the Firestore listener will add it, avoiding duplicates
+    const ap: Appointment = { ...data, calendarEventId };
     addLog(input.patientName, "Booked appointment", `${ap.serviceName} (${ap.date} ${ap.time})`, undefined, { status: ap.status, date: ap.date, time: ap.time });
     showToast(`Appointment booked for ${ap.date} at ${ap.time}.`, "success");
 

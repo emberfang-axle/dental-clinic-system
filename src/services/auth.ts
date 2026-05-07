@@ -5,7 +5,6 @@
   updateProfile as updateFirebaseProfile,
   verifyBeforeUpdateEmail,
   sendPasswordResetEmail,
-  sendEmailVerification,
   signInWithRedirect,
   getRedirectResult,
   getAuth,
@@ -55,7 +54,6 @@ export const authService = {
       active: true,
     };
     await setDocTyped<User>("users", user.id, user as any);
-    await sendEmailVerification(res.user);
     return user;
   },
 

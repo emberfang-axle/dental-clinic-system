@@ -8,20 +8,28 @@ function makeId(prefix: string) {
 }
 
 export const settingsService = {
-  updateClinic(partial: Partial<ClinicSettings>, actor: string) {
+  async updateClinic(partial: Partial<ClinicSettings>, actor: string) {
     const snap = getSnapshot();
-    setState({ settings: { ...snap.settings, ...partial } as ClinicSettings });
+    const next = { ...snap.settings, ...partial } as ClinicSettings;
+    setState({ settings: next });
+    await updateDocTyped("settings", "clinic", partial as any);
     if (snap.user) {
       notificationsService.notify(snap.user.id, "Clinic settings updated", `Updated by ${actor}.`, "system");
     }
   },
 
-  updateStaffPermission(staffId: string, partial: Partial<StaffPermission>, actor: string) {
+  async updateStaffPermission(staffId: string, partial: Partial<StaffPermission>, actor: string) {
     const snap = getSnapshot();
-    const next = snap.staffPermissions.map((p) =>
-      p.staffId === staffId ? ({ ...p, ...partial } as StaffPermission) : p
-    );
+    const existing = snap.staffPermissions.find((p) => p.staffId === staffId) || {
+      staffId, appointments: true, payments: true, records: true, adminSupport: true,
+    };
+    const next = snap.staffPermissions.some((p) => p.staffId === staffId)
+      ? snap.staffPermissions.map((p) => p.staffId === staffId ? ({ ...p, ...partial } as StaffPermission) : p)
+      : [...snap.staffPermissions, { ...existing, ...partial } as StaffPermission];
     setState({ staffPermissions: next });
+
+    // Persist inside the clinic settings doc (staffPermissions array)
+    await updateDocTyped("settings", "clinic", { staffPermissions: next } as any);
     notificationsService.notify(staffId, "Permissions updated", `Updated by ${actor}.`, "system");
   },
 
@@ -65,4 +73,5 @@ export const settingsService = {
     setState({ users: users.filter((u) => u.id !== staffId) });
   },
 };
+
 

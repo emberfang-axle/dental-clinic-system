@@ -12,9 +12,7 @@
 import {
   RecaptchaVerifier,
   signInWithPhoneNumber,
-  linkWithPhoneNumber,
   PhoneAuthProvider,
-  signInWithCredential,
   type ConfirmationResult,
 } from "firebase/auth";
 import { auth } from "./firebase";
@@ -93,27 +91,15 @@ export async function verifyOtp(
   confirmationResult: ConfirmationResult,
   code: string
 ): Promise<User | null> {
-  const credential = PhoneAuthProvider.credential(
+  // credential is only used to satisfy PhoneAuthProvider typing; actual confirm handles it
+  PhoneAuthProvider.credential(
     (confirmationResult as any).verificationId,
     code
   );
 
-  const currentUser = auth.currentUser;
-
-  if (currentUser) {
-    // Link phone to existing email/password account
-    try {
-      await linkWithPhoneNumber(auth, currentUser.phoneNumber ?? "", getRecaptchaVerifier("recaptcha-container"));
-    } catch {
-      // If linking fails (e.g. already linked), fall through to sign-in
-    }
-    // Use confirmationResult.confirm which handles both link and sign-in
-  }
-
   const result = await confirmationResult.confirm(code);
   const uid = result.user.uid;
 
-  // Mark phone as verified in Firestore
   const profile = await getDocTyped<User>("users", uid);
   if (profile) {
     await updateDocTyped<User>("users", uid, { phone: result.user.phoneNumber ?? profile.phone } as any);

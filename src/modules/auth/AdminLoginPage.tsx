@@ -29,7 +29,7 @@ export function AdminLoginPage({ navigate }: { navigate: (p: string) => void }) 
     try {
       const u = await authService.login(email, password);
       if (!u) {
-        setError("Invalid credentials.");
+        setError("Account not found. Please contact the clinic administrator.");
         setLoading(false);
         return;
       }
@@ -40,7 +40,16 @@ export function AdminLoginPage({ navigate }: { navigate: (p: string) => void }) 
       }
       navigate(dashboardPathFor(u.role));
     } catch (err: any) {
-      setError(err.message || "Login failed.");
+      const code = err?.code ?? "";
+      if (code === "auth/invalid-credential" || code === "auth/wrong-password" || code === "auth/user-not-found") {
+        setError("Incorrect email or password. Please try again.");
+      } else if (code === "auth/too-many-requests") {
+        setError("Too many failed attempts. Please reset your password or try again later.");
+      } else if (code === "auth/user-disabled") {
+        setError("This account has been disabled. Please contact the administrator.");
+      } else {
+        setError(err.message || "Login failed.");
+      }
       setLoading(false);
     }
   }

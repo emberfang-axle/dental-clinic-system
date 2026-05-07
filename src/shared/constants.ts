@@ -11,7 +11,7 @@ export const CLINIC = {
   phone: "0910 761 4956",
   email: "drkingestandarte2022@gmail.com",
   facebookUrl: "https://www.facebook.com/Estandartedentalclinic",
-  hours: "Mon — Fri : 9 AM — 4 PM",
+  hours: "Mon — Sat : 9 AM — 5 PM",
   yearFounded: 2022,
 } as const;
 

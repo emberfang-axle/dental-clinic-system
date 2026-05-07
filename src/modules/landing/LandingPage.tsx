@@ -27,7 +27,12 @@ export function LandingPage({ navigate }: { navigate: (p: string) => void }) {
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenu, setMobileMenu] = useState(false);
   const [showAllServices, setShowAllServices] = useState(false);
-  const displayedServices = showAllServices ? services : services.slice(0, 3);
+
+  // Deduplicate by name (case-insensitive), keep first occurrence
+  const uniqueServices = services.filter(
+    (s, i, arr) => arr.findIndex((x) => x.name.toLowerCase() === s.name.toLowerCase()) === i
+  );
+  const displayedServices = showAllServices ? uniqueServices : uniqueServices.slice(0, 3);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -274,7 +279,7 @@ export function LandingPage({ navigate }: { navigate: (p: string) => void }) {
           ))}
         </div>
         <div className="mt-8 flex flex-wrap justify-center gap-3">
-          {services.length > 3 && (
+          {uniqueServices.length > 3 && (
             <Button variant="outline" onClick={() => setShowAllServices((v) => !v)}>
               {showAllServices ? "Show Less" : "View All Services"}
             </Button>

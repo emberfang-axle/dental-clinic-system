@@ -10,7 +10,10 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(uid())).data;
     }
 
-    function role() { return userDoc().role; }
+    function role() {
+      let doc = get(/databases/$(database)/documents/users/$(uid()));
+      return doc.data.get('role', 'patient');
+    }
 
     function isAdminOrDoctor() { return role() in ['admin', 'doctor']; }
     function isStaffOrAbove()  { return role() in ['admin', 'doctor', 'staff']; }

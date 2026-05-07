@@ -114,7 +114,6 @@ export function SetupPage({ navigate }: { navigate: (p: string) => void }) {
             <div key={a.email} className="p-3 rounded-lg border border-gold-500/20 bg-ink-900/40 text-sm">
               <div className="font-medium text-gold-100">{a.name} <span className="text-gold-400 text-xs">({a.role})</span></div>
               <div className="text-gold-100/50 text-xs mt-0.5">{a.email}</div>
-              <div className="text-gold-100/40 text-xs font-mono">Password: {a.password}</div>
             </div>
           ))}
         </div>

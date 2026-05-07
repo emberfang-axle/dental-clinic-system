@@ -15,7 +15,10 @@ import { dashboardPathFor } from "../../shared/helpers";
 const TIME_SLOTS = BOOKING.TIME_SLOTS;
 
 export function BookAppointmentPage({ navigate }: { navigate: (p: string) => void }) {
-  const { user, services, appointments } = useStore();
+  const { user, services: rawServices, appointments } = useStore();
+  const services = rawServices.filter(
+    (s, i, arr) => arr.findIndex((x) => x.name.toLowerCase() === s.name.toLowerCase()) === i
+  );
   const [step, setStep] = useState(1);
   const [serviceId, setServiceId] = useState(services[0].id);
   const [doctor] = useState("Dr. Estandarte");
@@ -58,6 +61,7 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
       if (!time) { setBookingError("Please select a time slot."); return; }
       const today = new Date().toISOString().slice(0, 10);
       if (date < today) { setBookingError("Please select a future date."); return; }
+      if (new Date(date + "T00:00:00").getDay() === 0) { setBookingError("The clinic is closed on Sundays. Please pick another day."); return; }
     }
     setStep((s) => Math.min(s + 1, 4));
   }
@@ -111,8 +115,7 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
             <span className="text-gold-300 font-medium">{date}</span> at{" "}
             <span className="text-gold-300 font-medium">{time}</span> has been received.
           </p>
-          <p className="text-sm text-gold-100/55 mt-3">
-            <p className="text-sm text-gold-100/55 mt-3">Please arrive 10 minutes before your scheduled appointment.</p>
+          <p className="text-sm text-gold-100/55 mt-3">Please arrive 10 minutes before your scheduled appointment.</p>
             {paymentMethod === "gcash" ? (
               <div className="mt-4 rounded-xl border border-gold-500/25 bg-gold-500/8 p-4 text-sm text-gold-100/70">
                 <span className="text-gold-300 font-medium">GCash Payment:</span> After your treatment, scan the clinic GCash QR or send to the clinic number, then submit your reference number in your <span className="text-gold-300">Payment Center</span>.
@@ -122,7 +125,6 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
                 <span className="text-gold-300 font-medium">Cash Payment:</span> Prepare your cash on the day. Staff will collect payment after your treatment.
               </div>
             )}
-          </p>
           <div className="mt-8 flex justify-center gap-3">
             <Button onClick={() => navigate(dashboardPathFor(user.role))}>Go to Dashboard</Button>
             <Button variant="outline" onClick={() => navigate(ROUTES.home)}>Back to Home</Button>
@@ -213,7 +215,7 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
                 <div>
                   <Label>Date</Label>
                   <Input type="date" value={date} min={new Date().toISOString().slice(0, 10)} onChange={(e) => { setDate(e.target.value); setTime(""); }} />
-                  <p className="text-xs text-gold-100/50 mt-2">📅 Synced with Google Calendar.</p>
+                  <p className="text-xs text-gold-100/50 mt-2">🗓 Mon – Sat only. Closed on Sundays.</p>
                 </div>
                 <div>
                   <Label>Time Slot</Label>
@@ -249,16 +251,19 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
                 {emergency && <Row label="Priority" value={<Badge tone="emergency">EMERGENCY</Badge>} />}
               </div>
 
+              <div className="mt-5 rounded-xl border border-amber-500/30 bg-amber-500/8 p-4 text-xs text-amber-200/80 leading-relaxed">
+                <span className="font-semibold text-amber-300">Payment Policy: </span>
+                Post-treatment payment must be settled via cash, online (GCash/bank), or installment/downpayment as agreed. Payment must be confirmed before discharge.
+              </div>
+
               <div className="mt-6">
                 <p className="text-xs uppercase tracking-[0.2em] text-gold-300/60 mb-3">Payment Method</p>
                 <div className="grid grid-cols-2 gap-3">
                   <button type="button" onClick={() => setPaymentMethod("cash")} className={`p-4 rounded-xl border-2 text-left transition ${paymentMethod === "cash" ? "border-gold-400 bg-gold-500/10" : "border-gold-500/20 hover:border-gold-400/50"}`}>
-                    <div className="text-lg mb-1">💵</div>
                     <div className="font-semibold text-gold-100 text-sm">Cash</div>
                     <div className="text-xs text-gold-100/50 mt-0.5">Pay at the clinic after treatment</div>
                   </button>
                   <button type="button" onClick={() => setPaymentMethod("gcash")} className={`p-4 rounded-xl border-2 text-left transition ${paymentMethod === "gcash" ? "border-gold-400 bg-gold-500/10" : "border-gold-500/20 hover:border-gold-400/50"}`}>
-                    <div className="text-lg mb-1">📱</div>
                     <div className="font-semibold text-gold-100 text-sm">GCash</div>
                     <div className="text-xs text-gold-100/50 mt-0.5">Scan QR or send to clinic number</div>
                   </button>

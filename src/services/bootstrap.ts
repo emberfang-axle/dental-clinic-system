@@ -1,29 +1,44 @@
 ﻿import { onAuthStateChanged } from "firebase/auth";
 import type { ClinicSettings, StaffPermission, User, Appointment, NotificationEntry, FeedbackEntry, Service, AuditLog } from "../shared/types";
 import { auth } from "./firebase";
-import { listenCollection, listenDoc, listCollection, setDocTyped, qOrderBy, qWhere } from "./firestore";
+import { listenCollection, listenDoc, listCollection, setDocTyped, deleteDocTyped, qOrderBy, qWhere } from "./firestore";
 import { resetState, setState, getSnapshot } from "../store/store";
 import { scheduleAlertsService } from "./scheduleAlerts";
 
 const DEFAULT_SERVICES: Omit<Service, "id">[] = [
-  { name: "Tooth Extraction",         price: 800,   duration: 45, description: "Safe and gentle removal of damaged or decayed teeth." },
-  { name: "Tooth Filling",            price: 600,   duration: 30, description: "Restore cavities with tooth-colored composite fillings." },
-  { name: "Oral Prophylaxis (Cleaning)", price: 700, duration: 45, description: "Professional cleaning to remove plaque and tartar buildup." },
-  { name: "Teeth Whitening",          price: 3500,  duration: 60, description: "Brighten your smile with safe in-clinic whitening." },
-  { name: "Braces",                   price: 25000, duration: 90, description: "Orthodontic treatment for properly aligned teeth." },
-  { name: "Dentures",                 price: 8000,  duration: 60, description: "Comfortable, custom-fitted full or partial dentures." },
-  { name: "Root Canal Treatment",     price: 6500,  duration: 90, description: "Save infected teeth with modern endodontic care." },
-  { name: "Crowns and Bridges",       price: 9000,  duration: 75, description: "Restore strength and appearance with quality crowns." },
-  { name: "Veneers",                  price: 12000, duration: 90, description: "Cosmetic shells for a perfect, natural-looking smile." },
-  { name: "Odontectomy",              price: 5500,  duration: 90, description: "Surgical removal of impacted wisdom teeth." },
+  { name: "Tooth Extraction (Bunot)",       price: 800,   duration: 45, description: "Safe and gentle removal of damaged or decayed teeth." },
+  { name: "Tooth Filling (Pasta)",          price: 600,   duration: 30, description: "Restore cavities with tooth-colored composite fillings." },
+  { name: "Oral Prophylaxis (Cleaning)",    price: 700,   duration: 45, description: "Professional cleaning to remove plaque and tartar buildup." },
+  { name: "Teeth Whitening",               price: 3500,  duration: 60, description: "Brighten your smile with safe in-clinic whitening." },
+  { name: "Removable Dentures",            price: 8000,  duration: 60, description: "Comfortable, custom-fitted full or partial removable dentures." },
+  { name: "Orthodontics (Braces/Retainers)", price: 25000, duration: 90, description: "Orthodontic treatment using braces or retainers for aligned teeth." },
+  { name: "Root Canal Treatment",          price: 6500,  duration: 90, description: "Save infected teeth with modern endodontic care." },
+  { name: "Crowns and Bridges",            price: 9000,  duration: 75, description: "Restore strength and appearance with quality crowns and bridges." },
+  { name: "Odontectomy (3rd Molar Removal)", price: 5500, duration: 90, description: "Surgical removal of impacted third molar (wisdom teeth)." },
+  { name: "Veneers",                       price: 12000, duration: 90, description: "Cosmetic porcelain shells for a perfect, natural-looking smile." },
 ];
 
 async function seedServices() {
   const existing = await listCollection<Service>("services");
-  if (existing.length > 0) return;
+  const officialNames = new Set(DEFAULT_SERVICES.map((s) => s.name.toLowerCase()));
+
+  // Remove any doc not in the official list, and track duplicates
+  const seen = new Set<string>();
+  for (const s of existing) {
+    const key = s.name.toLowerCase();
+    if (!officialNames.has(key) || seen.has(key)) {
+      await deleteDocTyped("services", s.id);
+    } else {
+      seen.add(key);
+    }
+  }
+
+  // Add any official services not yet in Firestore
   for (const s of DEFAULT_SERVICES) {
-    const id = `svc_${Math.random().toString(16).slice(2)}_${Date.now().toString(16)}`;
-    await setDocTyped("services", id, { ...s, id } as any);
+    if (!seen.has(s.name.toLowerCase())) {
+      const id = `svc_${Math.random().toString(16).slice(2)}_${Date.now().toString(16)}`;
+      await setDocTyped("services", id, { ...s, id } as any);
+    }
   }
 }
 
