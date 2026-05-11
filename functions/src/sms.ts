@@ -1,4 +1,4 @@
-import {onDocumentUpdated} from "firebase-functions/v2/firestore";
+import {onDocumentCreated, onDocumentUpdated} from "firebase-functions/v2/firestore";
 import * as logger from "firebase-functions/logger";
 
 const SEMAPHORE_URL = "https://api.semaphore.co/api/v4/messages";
@@ -16,6 +16,25 @@ async function sendSms(to: string, message: string): Promise<void> {
   });
   if (!res.ok) logger.error("Semaphore error", await res.text());
 }
+
+/**
+ * Fires when a new appointment is created.
+ * Sends a booking-received SMS to the patient.
+ */
+export const appointmentBookedSms = onDocumentCreated(
+  {document: "appointments/{id}", secrets: ["SEMAPHORE_API_KEY"]},
+  async (event) => {
+    const data = event.data?.data();
+    if (!data) return;
+
+    const phone: string | undefined = data.patientPhone;
+    if (!phone) return;
+
+    await sendSms(phone,
+      `Hi ${data.patientName}! Your request for ${data.serviceName} on ${data.date} at ${data.time} has been received and is pending confirmation. - Estandarte Dental`
+    );
+  }
+);
 
 /**
  * Fires when an appointment is updated.
@@ -48,6 +67,17 @@ export const appointmentSms = onDocumentUpdated(
     if (before.paymentStatus !== "paid" && after.paymentStatus === "paid") {
       await sendSms(phone,
         `Hi ${after.patientName}! Payment of PHP ${after.price} for ${after.serviceName} confirmed. Receipt: ${after.receiptNumber ?? "—"}. Thank you!`
+      );
+    }
+    if (before.status !== "cancelled" && after.status === "cancelled") {
+      await sendSms(phone,
+        `Hi ${after.patientName}! Your ${after.serviceName} appointment on ${after.date} at ${after.time} has been cancelled. To rebook, visit our website or contact the clinic. - Estandarte Dental`
+      );
+    }
+
+    if (before.status !== "rescheduled" && after.status === "rescheduled") {
+      await sendSms(phone,
+        `Hi ${after.patientName}! Your ${after.serviceName} appointment has been rescheduled to ${after.date} at ${after.time}. Please arrive 10 mins early. - Estandarte Dental`
       );
     }
   }

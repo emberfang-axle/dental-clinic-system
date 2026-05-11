@@ -6,16 +6,23 @@ import { resetState, setState, getSnapshot } from "../store/store";
 import { scheduleAlertsService } from "./scheduleAlerts";
 
 const DEFAULT_SERVICES: Omit<Service, "id">[] = [
-  { name: "Tooth Extraction (Bunot)",       price: 800,   duration: 45, description: "Safe and gentle removal of damaged or decayed teeth." },
-  { name: "Tooth Filling (Pasta)",          price: 600,   duration: 30, description: "Restore cavities with tooth-colored composite fillings." },
-  { name: "Oral Prophylaxis (Cleaning)",    price: 700,   duration: 45, description: "Professional cleaning to remove plaque and tartar buildup." },
-  { name: "Teeth Whitening",               price: 3500,  duration: 60, description: "Brighten your smile with safe in-clinic whitening." },
-  { name: "Removable Dentures",            price: 8000,  duration: 60, description: "Comfortable, custom-fitted full or partial removable dentures." },
-  { name: "Orthodontics (Braces/Retainers)", price: 25000, duration: 90, description: "Orthodontic treatment using braces or retainers for aligned teeth." },
-  { name: "Root Canal Treatment",          price: 6500,  duration: 90, description: "Save infected teeth with modern endodontic care." },
-  { name: "Crowns and Bridges",            price: 9000,  duration: 75, description: "Restore strength and appearance with quality crowns and bridges." },
+  { name: "Oral Consultation",               price: 300,   duration: 20, description: "Initial check-up and dental assessment by the doctor." },
+  { name: "Oral Prophylaxis (Cleaning)",     price: 700,   priceMax: 800,  duration: 45, description: "Professional cleaning to remove plaque and tartar buildup." },
+  { name: "Tooth Extraction (Bunot)",        price: 700,   priceMax: 800,  duration: 45, description: "Safe and gentle removal of damaged or decayed teeth." },
+  { name: "Tooth Filling (Pasta)",           price: 600,   priceMax: 900,  duration: 30, description: "Restore cavities with tooth-colored composite fillings." },
+  { name: "Orthodontics (Braces)",           price: 25000, priceMax: 35000, duration: 90, description: "Orthodontic treatment using braces for aligned teeth.", requiresDeposit: true },
+  { name: "Braces Adjustment",              price: 1000,  duration: 30, description: "Routine tightening and adjustment of existing braces." },
+  { name: "Teeth Whitening",               price: 3500,  priceMax: 5000,  duration: 60, description: "Brighten your smile with safe in-clinic whitening." },
+  { name: "Removable Dentures",            price: 8000,  duration: 60, description: "Comfortable, custom-fitted full or partial removable dentures.", requiresDeposit: true },
+  { name: "Dentures",                      price: 4500,  duration: 60, description: "Standard dentures for missing teeth restoration." },
+  { name: "Ivocap Dentures",              price: 15000, duration: 60, description: "Premium Ivocap-processed dentures for superior fit and durability.", requiresDeposit: true },
+  { name: "Fixed Bridge",                  price: 6000,  duration: 75, description: "Permanent bridge anchored to adjacent teeth to replace missing ones." },
+  { name: "Crowns and Bridges",            price: 9000,  duration: 75, description: "Restore strength and appearance with quality crowns and bridges.", requiresDeposit: true },
+  { name: "Dental Crowns",                price: 8000,  duration: 60, description: "Cap damaged or weakened teeth with a custom dental crown." },
+  { name: "Root Canal Treatment",          price: 6500,  priceMax: 7000,  duration: 90, description: "Save infected teeth with modern endodontic care.", requiresDeposit: true },
   { name: "Odontectomy (3rd Molar Removal)", price: 5500, duration: 90, description: "Surgical removal of impacted third molar (wisdom teeth)." },
-  { name: "Veneers",                       price: 12000, duration: 90, description: "Cosmetic porcelain shells for a perfect, natural-looking smile." },
+  { name: "Veneers",                       price: 6500,  duration: 90, description: "Cosmetic porcelain shells per tooth for a perfect, natural-looking smile.", requiresDeposit: true },
+  { name: "Emergency Dental Services",     price: 1000,  duration: 30, description: "Priority care for urgent dental pain, trauma, or infections." },
 ];
 
 async function seedServices() {

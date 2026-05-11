@@ -52,10 +52,10 @@ export function StaffAccounts() {
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
-                        <div className="text-lg font-medium text-gold-100">{staff.name}</div>
+                        <div className="text-sm font-medium text-gold-100">{staff.name}</div>
                         <Badge tone="confirmed">{SUB_ROLE_LABELS[subRole]}</Badge>
                       </div>
-                      <div className="text-sm text-gold-100/50 mt-0.5">{staff.email} · {staff.phone}</div>
+                      <div className="text-xs text-gold-100/50 mt-0.5">{staff.email} · {staff.phone}</div>
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
                       <Select
@@ -83,7 +83,7 @@ export function StaffAccounts() {
                       </button>
                     </div>
                   </div>
-                  <div className="mt-4 grid sm:grid-cols-2 xl:grid-cols-4 gap-3">
+                  <div className="mt-4 grid grid-cols-2 xl:grid-cols-4 gap-2">
                     <PermissionToggle label="Appointments" enabled={permissions.appointments} onToggle={() => settingsService.updateStaffPermission(staff.id, { appointments: !permissions.appointments }, user!.name)} />
                     <PermissionToggle label="Payments"     enabled={permissions.payments}     onToggle={() => settingsService.updateStaffPermission(staff.id, { payments:      !permissions.payments     }, user!.name)} />
                     <PermissionToggle label="Records"      enabled={permissions.records}      onToggle={() => settingsService.updateStaffPermission(staff.id, { records:       !permissions.records      }, user!.name)} />
@@ -153,9 +153,9 @@ export function StaffAccounts() {
 
 function PermissionToggle({ label, enabled, onToggle }: { label: string; enabled: boolean; onToggle: () => void }) {
   return (
-    <button onClick={onToggle} className={`rounded-xl border px-4 py-3 text-left transition ${enabled ? "border-gold-500/40 bg-gold-500/12 text-gold-100" : "border-gold-500/12 text-gold-100/55 hover:border-gold-500/25"}`}>
-      <div className="text-[11px] uppercase tracking-[0.2em]">{label}</div>
-      <div className="mt-1 text-sm font-medium">{enabled ? "Enabled" : "Disabled"}</div>
+    <button onClick={onToggle} className={`rounded-xl border px-3 py-2.5 text-left transition ${enabled ? "border-gold-500/40 bg-gold-500/12 text-gold-100" : "border-gold-500/12 text-gold-100/55 hover:border-gold-500/25"}`}>
+      <div className="text-[9px] uppercase tracking-[0.15em] leading-tight">{label}</div>
+      <div className="mt-1 text-[10px] font-medium">{enabled ? "Enabled" : "Disabled"}</div>
     </button>
   );
 }

@@ -84,6 +84,8 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
       const ap = await appointmentsService.book({
         patientId: user!.id,
         patientName: user!.name,
+        patientEmail: user!.email,
+        patientPhone: user!.phone,
         serviceId: service.id,
         serviceName: service.name,
         price: service.price,
@@ -182,14 +184,27 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
               <div className="grid sm:grid-cols-2 gap-3">
                 {services.map((s) => (
                   <button key={s.id} onClick={() => setServiceId(s.id)} className={`text-left p-4 rounded-xl border transition ${serviceId === s.id ? "border-gold-400 bg-gold-500/10" : "border-gold-500/20 hover:border-gold-400/50"}`}>
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-2">
                       <span className="font-medium text-gold-100">{s.name}</span>
-                      <span className="text-gold-300 font-mono text-sm">₱{s.price.toLocaleString()}</span>
+                      <span className="text-gold-300 font-mono text-sm whitespace-nowrap">
+                        ₱{s.price.toLocaleString()}{s.priceMax ? `–₱${s.priceMax.toLocaleString()}` : ""}
+                      </span>
                     </div>
                     <div className="text-xs text-gold-100/50 mt-1">⏱ {s.duration} min · {s.description}</div>
+                    {s.requiresDeposit && (
+                      <div className="mt-2 text-[10px] uppercase tracking-wider font-semibold text-amber-300 bg-amber-500/10 border border-amber-500/25 rounded px-1.5 py-0.5 inline-block">
+                        30–50% deposit required
+                      </div>
+                    )}
                   </button>
                 ))}
               </div>
+              {service?.requiresDeposit && (
+                <div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/8 p-3 text-xs text-amber-200/80 leading-relaxed">
+                  <span className="font-semibold text-amber-300">Downpayment Notice: </span>
+                  This procedure requires a minimum 30–50% downpayment to confirm your reservation. The remaining balance can be settled during or after treatment.
+                </div>
+              )}
             </div>
           )}
 

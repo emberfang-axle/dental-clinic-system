@@ -28,6 +28,8 @@ export interface Service {
   id: string;
   name: string;
   price: number;
+  priceMax?: number;      // upper bound for range pricing (e.g. ₱700–₱800)
+  requiresDeposit?: boolean; // true = 30–50% downpayment required to confirm
   duration: number; // minutes
   description: string;
 }
@@ -54,6 +56,8 @@ export interface Appointment {
   id: string;
   patientId: string;
   patientName: string;
+  patientEmail?: string;
+  patientPhone?: string;
   serviceId: string;
   serviceName: string;
   price: number; // locked at booking time

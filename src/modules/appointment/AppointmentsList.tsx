@@ -99,9 +99,9 @@ function AppointmentCard({ a, role, isSelf, actor }: { a: Appointment; role: Rol
     <Card>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          {role !== "patient" && <p className="font-semibold text-gold-100">{a.patientName}</p>}
-          <p className="text-gold-100/80 font-medium">{a.serviceName}</p>
-          <p className="text-sm text-gold-100/55 mt-0.5">{a.date} · {a.time} · {a.doctor}</p>
+          {role !== "patient" && <p className="font-semibold text-gold-100 text-sm">{a.patientName}</p>}
+          <p className="text-gold-100/80 font-medium text-sm">{a.serviceName}</p>
+          <p className="text-xs text-gold-100/55 mt-0.5">{a.date} · {a.time} · {a.doctor}</p>
         </div>
         <div className="flex flex-wrap gap-2 items-center">
           {reminderBadge && (a.status === "pending" || a.status === "confirmed") && (

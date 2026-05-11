@@ -5,6 +5,6 @@ setGlobalOptions({maxInstances: 10});
 admin.initializeApp();
 
 export {paymongoWebhook} from "./paymongo";
-export {appointmentSms} from "./sms";
-export {appointmentEmail} from "./email";
+export {appointmentBookedSms, appointmentSms} from "./sms";
+export {appointmentBookedEmail, appointmentEmail, appointmentReminderEmail, announcementEmail} from "./email";
 export {calendarCreate, calendarDelete} from "./calendar";

@@ -13,8 +13,8 @@ import { dashboardPathFor } from "../../shared/helpers";
 const NAV_LINKS = [
   { label: "Home",     id: "home" },
   { label: "About",    id: "about" },
-  { label: "Services", id: "services" },
   { label: "Why Us",   id: "why" },
+  { label: "Services", id: "services" },
   { label: "Contact",  id: "contact" },
 ];
 
@@ -267,9 +267,19 @@ export function LandingPage({ navigate }: { navigate: (p: string) => void }) {
                 <p className="text-sm text-gold-100/55 leading-relaxed mb-5 min-h-10">{s.description}</p>
                 <div className="flex items-end justify-between pt-4 border-t border-gold-500/15">
                   <div>
-                    <div className="text-[9px] uppercase tracking-[0.25em] text-gold-300/60 mb-0.5">Starting at</div>
-                    <div className="font-serif text-2xl text-gold-shine">₱{s.price.toLocaleString()}</div>
+                    <div className="text-[9px] uppercase tracking-[0.25em] text-gold-300/60 mb-0.5">
+                      {s.priceMax ? "Starting at" : "Price"}
+                    </div>
+                    <div className="font-serif text-2xl text-gold-shine">
+                      ₱{s.price.toLocaleString()}
+                      {s.priceMax && <span className="text-lg"> – ₱{s.priceMax.toLocaleString()}</span>}
+                    </div>
                   </div>
+                  {s.requiresDeposit && (
+                    <span className="text-[9px] uppercase tracking-wider font-semibold text-amber-300 bg-amber-500/15 border border-amber-500/30 rounded px-2 py-1">
+                      Deposit Req.
+                    </span>
+                  )}
                 </div>
                 <button onClick={() => navigate(ROUTES.book)} className="mt-5 w-full text-center text-xs uppercase tracking-[0.2em] text-gold-300 hover:text-gold-100 py-3 border border-gold-500/20 hover:border-gold-400 rounded-md transition-all font-medium opacity-70 group-hover:opacity-100">
                   Book This Service →
