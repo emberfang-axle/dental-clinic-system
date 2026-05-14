@@ -1,43 +1,161 @@
-import { useCallback } from "react";
-import { Badge, Button, Card } from "../../components/ui";
+import { useCallback, useState } from "react";
+import { Badge, Button, Card, Input } from "../../components/ui";
 import { appointmentsService } from "../../services/appointments";
-import { paymentsService } from "../../services/payments";
 import { useStore } from "../../store/store";
 import { roleLabel } from "../../shared/helpers";
 import { downloadInvoice } from "../../utils/invoice";
 import type { Role, Appointment } from "../../shared/types";
+
+function usePaymentAction() {
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState("");
+
+  const run = useCallback(async (key: string, fn: () => Promise<void>) => {
+    setBusy(key); setError("");
+    try { await fn(); }
+    catch (e: any) { setError(e.message || "Action failed."); }
+    finally { setBusy(null); }
+  }, []);
+
+  return { busy, error, run };
+}
 
 export function PaymentsPage({ role }: { role: Role }) {
   const { appointments, user } = useStore() as {
     appointments: Appointment[];
     user: { id: string; name: string; role: Role } | null;
   };
+  const [search, setSearch] = useState("");
+  const { busy, error, run } = usePaymentAction();
 
   if (!user) return null;
 
-  const pending = appointments.filter((a) => a.paymentStatus === "pending_verification");
-  const partialPaid = appointments.filter((a) => a.paymentStatus === "partial_paid");
-  const verified = appointments.filter((a) => a.paymentStatus === "verified");
-  const paid = appointments.filter((a) => a.paymentStatus === "paid");
-  const cashToCollect = appointments.filter(
-    (a) => a.paymentMethod === "cash" && a.status === "completed" && a.paymentStatus === "unpaid",
-  );
+  const q = search.toLowerCase();
+  const match = (a: Appointment) =>
+    !q || `${a.patientName}${a.serviceName}${a.receiptNumber ?? ""}`.toLowerCase().includes(q);
 
-  const handleVerify = useCallback((appointmentId: string) => {
-    paymentsService.verify(appointmentId, user.name);
-  }, [user.name]);
+  const pendingVerification = appointments.filter((a) => a.paymentStatus === "pending_verification" && match(a));
+  const verified    = appointments.filter((a) => a.paymentStatus === "verified" && match(a));
+  const unpaid      = appointments.filter((a) => a.status === "completed" && a.paymentStatus === "unpaid" && match(a));
+  const partialPaid = appointments.filter((a) => a.paymentStatus === "partial_paid" && match(a));
+  const paid        = appointments.filter((a) => a.paymentStatus === "paid" && match(a));
 
-  const handleMarkUnpaid = useCallback((appointmentId: string) => {
-    appointmentsService.update(appointmentId, { paymentStatus: "unpaid" }, user.name);
-  }, [user.name]);
+  const markPaid = (id: string, method: "cash" | "gcash") =>
+    run(`paid-${id}-${method}`, () => appointmentsService.update(id, { paymentStatus: "paid", paymentMethod: method }, user.name));
 
-  const handleMarkPaid = useCallback((appointmentId: string) => {
-    appointmentsService.update(appointmentId, { paymentStatus: "paid" }, user.name);
-  }, [user.name]);
+  const verify = (id: string) =>
+    run(`verify-${id}`, () => appointmentsService.update(id, { paymentStatus: "verified" }, user.name));
+
+  const reject = (id: string) =>
+    run(`reject-${id}`, () => appointmentsService.update(id, { paymentStatus: "unpaid" }, user.name));
+
+  const markPaidFromVerified = (id: string) =>
+    run(`vpaid-${id}`, () => appointmentsService.update(id, { paymentStatus: "paid" }, user.name));
 
   return (
     <div className="space-y-6">
-      {/* Partial payments — deposit collected, balance outstanding */}
+      <div className="flex items-center gap-3">
+        <Input placeholder="Search patient, service, receipt…" value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-xs" />
+        <span className="text-xs text-gold-100/40 ml-auto">{roleLabel(role)}</span>
+      </div>
+
+      {error && (
+        <p className="text-sm text-red-300 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">{error}</p>
+      )}
+
+      {/* GCash pending verification */}
+      {pendingVerification.length > 0 && (
+        <Card>
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <h3 className="font-serif text-xl text-gold-gradient">GCash — Pending Verification</h3>
+            <Badge tone="pending">{pendingVerification.length}</Badge>
+          </div>
+          <div className="space-y-3">
+            {pendingVerification.map((a) => (
+              <div key={a.id} className="p-4 rounded-xl border border-blue-500/20 bg-blue-500/5 flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <div className="font-semibold text-gold-100">{a.patientName}</div>
+                  <div className="text-sm text-gold-100/60">{a.serviceName} · {a.date}</div>
+                  <div className="text-xs text-gold-300/70 mt-1">Amount: ₱{a.price.toLocaleString()}</div>
+                  {a.gcashRef && <div className="text-xs text-blue-300 mt-1">Ref: {a.gcashRef}</div>}
+                  {(a.gcashScreenshotUrl || a.paymentScreenshotUrl) && (
+                    <a href={a.gcashScreenshotUrl ?? a.paymentScreenshotUrl} target="_blank" rel="noreferrer"
+                      className="text-xs text-gold-400 underline mt-1 block">View Screenshot →</a>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="font-mono text-gold-gradient text-lg">₱{a.price.toLocaleString()}</div>
+                  <Button size="sm" disabled={!!busy} onClick={() => verify(a.id)}>
+                    {busy === `verify-${a.id}` ? "…" : "Verify"}
+                  </Button>
+                  <Button size="sm" variant="ghost" disabled={!!busy} onClick={() => reject(a.id)}>
+                    {busy === `reject-${a.id}` ? "…" : "Reject"}
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {/* Verified — ready to mark paid */}
+      {verified.length > 0 && (
+        <Card>
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <h3 className="font-serif text-xl text-gold-gradient">Verified — Mark as Paid</h3>
+            <Badge tone="confirmed">{verified.length}</Badge>
+          </div>
+          <div className="space-y-3">
+            {verified.map((a) => (
+              <div key={a.id} className="p-4 rounded-xl border border-purple-500/20 bg-purple-500/5 flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <div className="font-semibold text-gold-100">{a.patientName}</div>
+                  <div className="text-sm text-gold-100/60">{a.serviceName} · {a.date}</div>
+                  {a.gcashRef && <div className="text-xs text-purple-300 mt-1">Ref: {a.gcashRef}</div>}
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="font-mono text-gold-gradient text-lg">₱{a.price.toLocaleString()}</div>
+                  <Button size="sm" disabled={!!busy} onClick={() => markPaidFromVerified(a.id)}>
+                    {busy === `vpaid-${a.id}` ? "…" : "Mark Paid"}
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {/* Unpaid completed appointments */}
+      {unpaid.length > 0 && (
+        <Card>
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <h3 className="font-serif text-xl text-gold-gradient">Unpaid — Completed</h3>
+            <Badge tone="cancelled">{unpaid.length}</Badge>
+          </div>
+          <div className="space-y-3">
+            {unpaid.map((a) => (
+              <div key={a.id} className="p-4 rounded-xl border border-red-500/20 bg-red-500/5 flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <div className="font-semibold text-gold-100">{a.patientName}</div>
+                  <div className="text-sm text-gold-100/60">{a.serviceName} · {a.date}</div>
+                  <div className="text-xs text-gold-300/70 mt-1">Total due: ₱{a.price.toLocaleString()}</div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="font-mono text-gold-gradient text-lg">₱{a.price.toLocaleString()}</div>
+                  <Button size="sm" disabled={!!busy} onClick={() => markPaid(a.id, "cash")}>
+                    {busy === `paid-${a.id}-cash` ? "…" : "Cash — Paid"}
+                  </Button>
+                  <Button size="sm" variant="subtle" disabled={!!busy} onClick={() => markPaid(a.id, "gcash")}>
+                    {busy === `paid-${a.id}-gcash` ? "…" : "GCash — Paid"}
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {/* Partial payments */}
       {partialPaid.length > 0 && (
         <Card>
           <div className="flex items-center justify-between gap-3 mb-4">
@@ -56,7 +174,18 @@ export function PaymentsPage({ role }: { role: Role }) {
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="font-mono text-gold-gradient text-lg">₱{a.price.toLocaleString()}</div>
-                  <Button size="sm" onClick={() => handleMarkPaid(a.id)}>Mark Balance Paid</Button>
+                  {a.status === "completed" ? (
+                    <>
+                      <Button size="sm" disabled={!!busy} onClick={() => markPaid(a.id, "cash")}>
+                        {busy === `paid-${a.id}-cash` ? "…" : "Cash — Paid"}
+                      </Button>
+                      <Button size="sm" variant="subtle" disabled={!!busy} onClick={() => markPaid(a.id, "gcash")}>
+                        {busy === `paid-${a.id}-gcash` ? "…" : "GCash — Paid"}
+                      </Button>
+                    </>
+                  ) : (
+                    <span className="text-xs text-gold-100/40 italic">Awaiting treatment completion</span>
+                  )}
                 </div>
               </div>
             ))}
@@ -64,78 +193,11 @@ export function PaymentsPage({ role }: { role: Role }) {
         </Card>
       )}
 
-      <div className="grid xl:grid-cols-2 gap-6">
-        {/* Pending GCash — patient submitted reference, staff verifies */}
-        <Card>
-          <div className="flex items-center justify-between gap-3 mb-4">
-            <h3 className="font-serif text-xl text-gold-gradient">Pending GCash Verification</h3>
-            <Badge tone="pending">{pending.length}</Badge>
-          </div>
-          {pending.length === 0 ? (
-            <p className="text-gold-100/50 text-sm">No pending GCash payments.</p>
-          ) : (
-            <div className="space-y-3">
-              {pending.map((a) => (
-                <div key={a.id} className="p-4 rounded-xl border border-yellow-500/20 bg-yellow-500/5">
-                  <div className="flex flex-wrap items-start justify-between gap-4">
-                    <div>
-                      <div className="font-semibold text-gold-100">{a.patientName}</div>
-                      <div className="text-sm text-gold-100/60">{a.serviceName} · {a.date} {a.time}</div>
-                      <div className="text-xs text-gold-300/80 mt-1">
-                        Reference: <span className="font-mono">{a.gcashRef || "—"}</span>
-                      </div>
-                      <div className="text-xs text-gold-100/45 mt-1">
-                        Screenshot:{" "}
-                        {a.paymentScreenshotUrl ? (
-                          <a href={a.paymentScreenshotUrl} target="_blank" rel="noreferrer" className="underline text-gold-300">View proof</a>
-                        ) : "Not provided"}
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="font-mono text-gold-gradient text-xl">₱{a.price.toLocaleString()}</div>
-                      <div className="mt-2 flex gap-2 justify-end flex-wrap">
-                        <Button size="sm" onClick={() => handleVerify(a.id)}>Verify</Button>
-                        <Button size="sm" variant="ghost" onClick={() => handleMarkUnpaid(a.id)}>Mark Unpaid</Button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </Card>
-
-        {/* Verified GCash + Cash to collect */}
-        <Card>
-          <div className="flex items-center justify-between gap-3 mb-4">
-            <h3 className="font-serif text-xl text-gold-gradient">Verified / Ready to Post</h3>
-            <Badge tone="confirmed">{verified.length + cashToCollect.length}</Badge>
-          </div>
-          <div className="space-y-3">
-            {[...verified, ...cashToCollect].map((a) => (
-              <div key={a.id} className="rounded-xl border border-gold-500/15 bg-ink-900/55 p-4 flex flex-wrap items-center justify-between gap-4">
-                <div>
-                  <div className="font-medium text-gold-100">{a.patientName}</div>
-                  <div className="text-sm text-gold-100/55">{a.serviceName} · {a.paymentMethod.toUpperCase()}</div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="font-mono text-gold-300">₱{a.price.toLocaleString()}</div>
-                  <Button size="sm" onClick={() => handleMarkPaid(a.id)}>Mark Paid</Button>
-                </div>
-              </div>
-            ))}
-            {verified.length + cashToCollect.length === 0 && (
-              <p className="text-sm text-gold-100/50">Nothing waiting to be posted as paid.</p>
-            )}
-          </div>
-        </Card>
-      </div>
-
       {/* Paid transactions */}
       <Card>
         <div className="flex items-center justify-between gap-3 mb-4">
           <h3 className="font-serif text-xl text-gold-gradient">Paid Transactions</h3>
-          <span className="text-xs uppercase tracking-[0.24em] text-gold-300/45">{roleLabel(role)}</span>
+          <Badge tone="paid">{paid.length}</Badge>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm min-w-[760px]">
@@ -143,29 +205,29 @@ export function PaymentsPage({ role }: { role: Role }) {
               <tr>
                 <th className="py-2">Patient</th>
                 <th>Service</th>
+                <th>Date</th>
                 <th>Method</th>
                 <th>Receipt</th>
-                <th>Reference</th>
                 <th className="text-right">Amount</th>
                 <th></th>
               </tr>
             </thead>
             <tbody>
               {paid.map((a) => (
-                <tr key={a.id} className="border-t border-gold-500/10">
+                <tr key={a.id} className="border-t border-gold-500/10 hover:bg-gold-500/5 transition">
                   <td className="py-3 text-gold-100">{a.patientName}</td>
                   <td className="text-gold-100/70">{a.serviceName}</td>
+                  <td className="text-gold-100/60 text-xs">{a.date}</td>
                   <td className="capitalize text-gold-100/70">{a.paymentMethod}</td>
                   <td className="text-xs text-gold-300">{a.receiptNumber || "—"}</td>
-                  <td className="font-mono text-xs text-gold-100/55">{a.gcashRef || "—"}</td>
                   <td className="text-right font-mono text-gold-300">₱{a.price.toLocaleString()}</td>
                   <td className="text-right">
                     <button
                       onClick={() => downloadInvoice(a)}
-                      disabled={a.status !== "completed" || a.paymentStatus !== "paid"}
-                      className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md border border-gold-500/30 text-gold-300 hover:bg-gold-500/10 hover:text-gold-100 transition disabled:opacity-30 disabled:cursor-not-allowed whitespace-nowrap"
+                      disabled={a.status !== "completed"}
+                      className="text-xs px-3 py-1.5 rounded-md border border-gold-500/30 text-gold-300 hover:bg-gold-500/10 transition disabled:opacity-30 disabled:cursor-not-allowed whitespace-nowrap"
                     >
-                      🖨 Print Invoice
+                      Print Invoice
                     </button>
                   </td>
                 </tr>

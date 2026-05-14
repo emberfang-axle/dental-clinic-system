@@ -63,7 +63,7 @@ export function AnnouncementsPage() {
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  {a.pinned && <span className="text-[10px] uppercase tracking-wider text-gold-400 font-semibold">📌 Pinned</span>}
+                  {a.pinned && <span className="text-[10px] uppercase tracking-wider text-gold-400 font-semibold">Pinned</span>}
                   <h4 className="font-semibold text-gold-100">{a.title}</h4>
                 </div>
                 <p className="text-sm text-gold-100/65 mt-2 leading-relaxed">{a.body}</p>

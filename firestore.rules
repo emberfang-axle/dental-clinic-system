@@ -3,16 +3,10 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     function authed() { return request.auth != null; }
-
-    function uid() { return request.auth.uid; }
-
-    function userDoc() {
-      return get(/databases/$(database)/documents/users/$(uid())).data;
-    }
+    function uid()    { return request.auth.uid; }
 
     function role() {
-      let doc = get(/databases/$(database)/documents/users/$(uid()));
-      return doc.data.get('role', 'patient');
+      return get(/databases/$(database)/documents/users/$(uid())).data.get('role', 'patient');
     }
 
     function isAdminOrDoctor() { return role() in ['admin', 'doctor']; }
@@ -20,7 +14,6 @@ service cloud.firestore {
 
     // ── USERS ──────────────────────────────────────────────
     match /users/{userId} {
-      // Anyone authenticated can read user list (needed for staff/doctor lookups)
       allow read: if authed();
 
       // Self-register as patient only
@@ -28,7 +21,7 @@ service cloud.firestore {
         && uid() == userId
         && request.resource.data.role == 'patient';
 
-      // Own profile update (cannot change own role)
+      // Own profile update — cannot escalate own role
       allow update: if authed()
         && uid() == userId
         && request.resource.data.role == resource.data.role;
@@ -42,12 +35,34 @@ service cloud.firestore {
       allow read: if authed() && (
         resource.data.patientId == uid() || isStaffOrAbove()
       );
+
       allow create: if authed() && (
-        request.resource.data.patientId == uid() || isStaffOrAbove()
+        isStaffOrAbove() ||
+        (
+          request.resource.data.status == 'pending' &&
+          request.resource.data.paymentStatus == 'unpaid' &&
+          request.resource.data.patientId == uid()
+        )
       );
+
+      // Patients can only cancel or reschedule their own appointments
+      // Payment is now staff-only — patients cannot touch paymentStatus
       allow update: if authed() && (
-        resource.data.patientId == uid() || isStaffOrAbove()
+        isStaffOrAbove() ||
+        (
+          resource.data.patientId == uid() &&
+          request.resource.data.patientId == resource.data.patientId &&
+          request.resource.data.price == resource.data.price &&
+          request.resource.data.serviceId == resource.data.serviceId &&
+          request.resource.data.paymentStatus == resource.data.paymentStatus &&
+          request.resource.data.paymentMethod == resource.data.paymentMethod &&
+          (
+            (request.resource.data.status == 'cancelled'   && resource.data.status in ['pending', 'confirmed']) ||
+            (request.resource.data.status == 'rescheduled' && resource.data.status in ['pending', 'confirmed'])
+          )
+        )
       );
+
       allow delete: if authed() && (
         resource.data.patientId == uid() || isAdminOrDoctor()
       );
@@ -82,7 +97,7 @@ service cloud.firestore {
     // ── FEEDBACK ──────────────────────────────────────────
     match /feedbacks/{feedbackId} {
       allow read: if true;
-      allow create: if authed();
+      allow create: if authed() && request.resource.data.userId == uid();
       allow update, delete: if authed() && (
         resource.data.userId == uid() || isAdminOrDoctor()
       );

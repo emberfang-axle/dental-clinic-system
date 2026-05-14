@@ -263,3 +263,55 @@ export function StatCard({
     </Card>
   );
 }
+
+/** Skeleton loader for content placeholders */
+export function Skeleton({ className }: { className?: string }) {
+  return (
+    <div className={cn("animate-pulse rounded-md bg-gold-500/10", className)} />
+  );
+}
+
+/** Confirmation dialog overlay */
+export function ConfirmDialog({
+  open,
+  title,
+  message,
+  confirmLabel = "Confirm",
+  danger = false,
+  onConfirm,
+  onCancel,
+}: {
+  open: boolean;
+  title: string;
+  message: string;
+  confirmLabel?: string;
+  danger?: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <button className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onCancel} aria-label="Close" />
+      <div className="relative glass-strong rounded-2xl p-6 max-w-sm w-full shadow-luxe">
+        <h3 className="font-serif text-xl text-gold-shine mb-2">{title}</h3>
+        <p className="text-sm text-gold-100/70 mb-6">{message}</p>
+        <div className="flex gap-3 justify-end">
+          <Button variant="ghost" onClick={onCancel}>Cancel</Button>
+          <Button variant={danger ? "danger" : "primary"} onClick={onConfirm}>{confirmLabel}</Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Empty state placeholder */
+export function EmptyState({ icon = "📭", title, subtitle }: { icon?: string; title: string; subtitle?: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-16 text-center">
+      <div className="text-4xl mb-3">{icon}</div>
+      <p className="text-gold-100/60 font-medium">{title}</p>
+      {subtitle && <p className="text-xs text-gold-100/40 mt-1">{subtitle}</p>}
+    </div>
+  );
+}

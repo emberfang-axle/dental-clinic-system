@@ -19,6 +19,7 @@ export function initials(name: string): string {
 export function shortRole(role: Role): string {
   if (role === "admin") return "Admin";
   if (role === "doctor") return "Doctor";
+  if (role === "co-doctor") return "Co-Doctor";
   if (role === "staff") return "Staff";
   return "Patient";
 }
@@ -26,32 +27,30 @@ export function shortRole(role: Role): string {
 export function roleLabel(role: Role): string {
   if (role === "admin") return "Admin · System Owner";
   if (role === "doctor") return "Doctor · Owner / Admin";
+  if (role === "co-doctor") return "Co-Doctor · Associate";
   if (role === "staff") return "Staff · Admin Support";
   return "Patient · Client";
 }
 
 export function formatDateTime(value: string): string {
-  return new Date(value).toLocaleString();
+  return new Date(value).toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short" });
 }
 
-/** Convert a paid appointment into a downloadable text-based receipt URL. */
-export function receiptHref(a: Appointment): string {
-  const body = [
-    "Estandarte Dental Clinic",
-    `Receipt No: ${a.receiptNumber || "Pending"}`,
-    `Patient: ${a.patientName}`,
-    `Service: ${a.serviceName}`,
-    `Date: ${a.date} ${a.time}`,
-    `Payment Method: ${a.paymentMethod.toUpperCase()}`,
-    `Amount: ₱${a.price.toLocaleString()}`,
-  ].join("\n");
-  return `data:text/plain;charset=utf-8,${encodeURIComponent(body)}`;
+export function formatDate(value: string): string {
+  return new Date(value).toLocaleDateString("en-PH", { dateStyle: "medium" });
+}
+
+/** Convert a paid appointment into a downloadable receipt — opens print dialog. */
+export function receiptHref(_a: Appointment): string {
+  // Kept for backward compat — callers should use downloadInvoice() instead
+  return "#";
 }
 
 /** Map a role to its dashboard route. */
 export function dashboardPathFor(role: Role): string {
   if (role === "admin") return ROUTES.adminDashboard;
   if (role === "doctor") return ROUTES.doctorDashboard;
+  if (role === "co-doctor") return ROUTES.coDoctorDashboard;
   if (role === "staff") return ROUTES.staffDashboard;
   return ROUTES.patientDashboard;
 }
@@ -60,10 +59,9 @@ export function canAccessRoute(path: string, role: Role | undefined): boolean {
   if (!path.startsWith(ROUTES.dashboard)) return true;
   if (!role) return false;
   if (path === ROUTES.dashboard) return true;
-  // Admin can access admin dashboard
   if (path === ROUTES.adminDashboard) return role === "admin" || role === "doctor";
-  // Doctor can access doctor dashboard
   if (path === ROUTES.doctorDashboard) return role === "doctor";
+  if (path === ROUTES.coDoctorDashboard) return role === "co-doctor";
   if (path === ROUTES.staffDashboard) return role === "staff";
   if (path === ROUTES.patientDashboard) return role === "patient";
   return false;

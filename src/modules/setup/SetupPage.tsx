@@ -8,7 +8,7 @@ import { auth } from "../../services/firebase";
 import { setDocTyped, getDocTyped } from "../../services/firestore";
 import type { User } from "../../shared/types";
 
-const ACCOUNTS: Array<{ email: string; password: string; name: string; role: "doctor" | "staff"; phone: string }> = [
+const ACCOUNTS: Array<{ email: string; password: string; name: string; role: "doctor" | "co-doctor" | "staff"; phone: string }> = [
   {
     email: "drkingestandarte2022@gmail.com",
     password: "doctor123",
@@ -17,11 +17,25 @@ const ACCOUNTS: Array<{ email: string; password: string; name: string; role: "do
     phone: "09107614956",
   },
   {
-    email: "staff@gmail.com",
-    password: "staff123",
-    name: "Clinic Staff",
+    email: "kim@estandarte.ph",
+    password: "kim123",
+    name: "Dr. Kim Precioso",
+    role: "co-doctor",
+    phone: "09000000001",
+  },
+  {
+    email: "mary@estandarte.ph",
+    password: "mary123",
+    name: "Dr. Mary Ann Ransas",
+    role: "co-doctor",
+    phone: "09000000002",
+  },
+  {
+    email: "staff@estandarte.ph",
+    password: "Staff2022!",
+    name: "Staff",
     role: "staff",
-    phone: "09123456789",
+    phone: "09000000003",
   },
 ];
 

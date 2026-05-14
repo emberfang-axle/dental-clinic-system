@@ -12,12 +12,15 @@ export function StaffRecordsSupport() {
   const [supportNote, setSupportNote] = useState(selected?.supportNote || "");
   const [status, setStatus] = useState<AppointmentStatus>(selected?.status || "pending");
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
 
   useEffect(() => {
     if (!selected) return;
     setSupportNote(selected.supportNote || "");
     setStatus(selected.status);
     setSaved(false);
+    setSaveError("");
   }, [selected?.id, selected?.updatedAt]);
 
   if (!selected) return <Card><p className="text-sm text-gold-100/60">No appointment records available.</p></Card>;
@@ -57,7 +60,7 @@ export function StaffRecordsSupport() {
           <Select value={status} onChange={(e) => setStatus(e.target.value as AppointmentStatus)}>
             <option value="pending">Pending</option>
             <option value="confirmed">Confirmed</option>
-            <option value="completed">Completed</option>
+            <option value="in-progress">In Progress</option>
             <option value="cancelled">Cancelled</option>
           </Select>
         </div>
@@ -67,9 +70,28 @@ export function StaffRecordsSupport() {
             placeholder="Example: Patient arrived early, chart prepared, GCash ref checked, doctor informed..." />
         </div>
         <div className="mt-5 flex flex-wrap items-center gap-3">
-          <Button onClick={() => { appointmentsService.update(selected.id, { supportNote, status }, user!.name); setSaved(true); }}>Save Support Update</Button>
-          <Button variant="subtle" onClick={() => appointmentsService.update(selected.id, { status: "confirmed" }, user!.name)}>Mark Confirmed</Button>
-          <Button variant="ghost" onClick={() => appointmentsService.update(selected.id, { status: "completed" }, user!.name)}>Mark Completed</Button>
+          <Button disabled={saving} onClick={async () => {
+            setSaving(true); setSaveError(""); setSaved(false);
+            try {
+              await appointmentsService.update(selected.id, { supportNote, status }, user!.name);
+              setSaved(true);
+            } catch (e: any) {
+              setSaveError(e.message || "Save failed.");
+            } finally { setSaving(false); }
+          }}>
+            {saving ? "Saving…" : "Save Support Update"}
+          </Button>
+          <Button variant="subtle" disabled={saving} onClick={async () => {
+            setSaving(true); setSaveError("");
+            try {
+              await appointmentsService.update(selected.id, { status: "confirmed" }, user!.name);
+            } catch (e: any) {
+              setSaveError(e.message || "Failed.");
+            } finally { setSaving(false); }
+          }}>
+            Mark Confirmed
+          </Button>
+          {saveError && <p className="text-xs text-red-300">{saveError}</p>}
         </div>
       </Card>
     </div>

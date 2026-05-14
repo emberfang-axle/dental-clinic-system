@@ -12,7 +12,6 @@
 import {
   RecaptchaVerifier,
   signInWithPhoneNumber,
-  PhoneAuthProvider,
   type ConfirmationResult,
 } from "firebase/auth";
 import { auth } from "./firebase";
@@ -91,12 +90,6 @@ export async function verifyOtp(
   confirmationResult: ConfirmationResult,
   code: string
 ): Promise<User | null> {
-  // credential is only used to satisfy PhoneAuthProvider typing; actual confirm handles it
-  PhoneAuthProvider.credential(
-    (confirmationResult as any).verificationId,
-    code
-  );
-
   const result = await confirmationResult.confirm(code);
   const uid = result.user.uid;
 

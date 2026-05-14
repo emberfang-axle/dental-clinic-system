@@ -32,10 +32,6 @@ export function uploadFile(
   });
 }
 
-export function gcashScreenshotPath(appointmentId: string, fileName: string) {
-  return `gcash-screenshots/${appointmentId}/${Date.now()}-${fileName}`;
-}
-
 export function treatmentPhotoPath(appointmentId: string, type: "before" | "after", fileName: string) {
   return `treatment-photos/${appointmentId}/${type}-${Date.now()}-${fileName}`;
 }

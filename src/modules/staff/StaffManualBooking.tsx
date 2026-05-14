@@ -1,0 +1,170 @@
+/**
+ * Manual appointment entry for staff.
+ * Used for walk-in, Facebook, and SMS bookings.
+ */
+
+import { useState } from "react";
+import { Button, Input, Label, Select } from "../../components/ui";
+import { appointmentsService } from "../../services/appointments";
+import { useStore } from "../../store/store";
+import { BOOKING } from "../../shared/constants";
+import type { AppointmentSource } from "../../shared/types";
+
+const defaultDoctors: string[] = [];
+
+const tomorrow = () => {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  return d.toISOString().slice(0, 10);
+};
+
+export function StaffManualBooking({ onClose }: { onClose: () => void }) {
+  const { services, users } = useStore();
+  const dbDoctors = users
+    .filter((u) => (u.role === "doctor" || u.role === "co-doctor") && u.active !== false)
+    .map((u) => u.name);
+  const doctorOptions = [...new Set([...defaultDoctors, ...dbDoctors])];
+
+  const [patientName, setPatientName] = useState("");
+  const [patientPhone, setPatientPhone] = useState("");
+  const [serviceId, setServiceId] = useState(services[0]?.id ?? "");
+  const [doctor, setDoctor] = useState(doctorOptions[0] ?? "");
+  const [date, setDate] = useState(tomorrow());
+  const [time, setTime] = useState("");
+  const [source, setSource] = useState<AppointmentSource>("walk-in");
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [done, setDone] = useState(false);
+
+  const service = services.find((s) => s.id === serviceId);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    if (!patientName.trim()) { setError("Patient name is required."); return; }
+    if (!time) { setError("Please select a time slot."); return; }
+    if (new Date(date + "T00:00:00").getDay() === 0) { setError("Clinic is closed on Sundays."); return; }
+    if (!service) return;
+
+    setSaving(true);
+    try {
+      // Look up registered patient by name, fall back to a unique walk-in ID
+      const matched = users.find((u) => u.role === "patient" &&
+        u.name.toLowerCase() === patientName.trim().toLowerCase());
+      await appointmentsService.book({
+        patientId: matched?.id ?? `walkin_${crypto.randomUUID()}`,
+        patientName: patientName.trim(),
+        patientPhone: patientPhone.trim() || undefined,
+        serviceId: service.id,
+        serviceName: service.name,
+        price: service.price,
+        doctor,
+        date,
+        time,
+        status: "pending",
+        paymentMethod: "cash",
+        paymentStatus: "unpaid",
+        source,
+      });
+      setDone(true);
+    } catch (err: any) {
+      setError(err.message || "Failed to book appointment.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (done) {
+    return (
+      <div className="text-center py-6 space-y-4">
+        <div className="text-4xl">✓</div>
+        <p className="text-gold-100 font-medium">Appointment booked for <span className="text-gold-300">{patientName}</span></p>
+        <p className="text-xs text-gold-100/50">{service?.name} · {date} at {time}</p>
+        <div className="flex justify-center gap-3 pt-2">
+          <Button onClick={() => { setDone(false); setPatientName(""); setPatientPhone(""); setTime(""); }}>Book Another</Button>
+          <Button variant="ghost" onClick={onClose}>Close</Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={submit} className="space-y-4">
+      <div className="grid sm:grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="mb-name">Patient Name</Label>
+          <Input id="mb-name" placeholder="Full name" value={patientName} onChange={(e) => setPatientName(e.target.value)} required />
+        </div>
+        <div>
+          <Label htmlFor="mb-phone">Contact Number</Label>
+          <Input id="mb-phone" placeholder="09XX XXX XXXX" value={patientPhone} onChange={(e) => setPatientPhone(e.target.value)} />
+        </div>
+      </div>
+
+      <div>
+        <Label htmlFor="mb-service">Procedure</Label>
+        <Select id="mb-service" value={serviceId} onChange={(e) => setServiceId(e.target.value)}>
+          {services.map((s) => (
+            <option key={s.id} value={s.id}>{s.name}</option>
+          ))}
+        </Select>
+      </div>
+
+      <div className="grid sm:grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="mb-doctor">Doctor</Label>
+          <Select id="mb-doctor" value={doctor} onChange={(e) => setDoctor(e.target.value)}>
+            {doctorOptions.map((d) => <option key={d} value={d}>{d}</option>)}
+          </Select>
+        </div>
+        <div>
+          <Label htmlFor="mb-source">Booking Source</Label>
+          <Select id="mb-source" value={source} onChange={(e) => setSource(e.target.value as AppointmentSource)}>
+            <option value="walk-in">Walk-in</option>
+            <option value="facebook">Facebook</option>
+            <option value="sms">Text Message (SMS)</option>
+          </Select>
+        </div>
+      </div>
+
+      <div className="grid sm:grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="mb-date">Date</Label>
+          <Input
+            id="mb-date"
+            type="date"
+            value={date}
+            min={tomorrow()}
+            onChange={(e) => { setDate(e.target.value); setTime(""); }}
+          />
+        </div>
+        <div>
+          <Label>Time Slot</Label>
+          <div className="flex flex-wrap gap-2">
+            {BOOKING.TIME_SLOTS.map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setTime(t)}
+                className={`px-3 py-1.5 rounded-lg text-xs border transition ${
+                  time === t
+                    ? "bg-gold-gradient text-ink-950 border-gold-400 font-semibold"
+                    : "border-gold-500/30 text-gold-100/80 hover:border-gold-400"
+                }`}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {error && <p className="text-xs text-red-300 bg-red-500/10 border border-red-500/20 rounded px-3 py-2">{error}</p>}
+
+      <div className="flex justify-end gap-3 pt-2">
+        <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
+        <Button type="submit" disabled={saving}>{saving ? "Booking…" : "Book Appointment"}</Button>
+      </div>
+    </form>
+  );
+}

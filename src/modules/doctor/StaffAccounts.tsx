@@ -21,7 +21,7 @@ const SUB_ROLE_DEFAULTS: Record<StaffSubRole, Omit<StaffPermission, "staffId" | 
 export function StaffAccounts() {
   const { users, staffPermissions, user } = useStore();
   const staffUsers = users.filter((u) => u.role === "staff");
-  const [newStaff, setNewStaff] = useState({ name: "", email: "", phone: "", password: "", subRole: "general" as StaffSubRole });
+  const [newStaff, setNewStaff] = useState({ name: "", email: "", phone: "", password: "", role: "staff" as "staff" | "co-doctor", subRole: "general" as StaffSubRole });
   const [created, setCreated] = useState(false);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState("");
@@ -101,23 +101,39 @@ export function StaffAccounts() {
           <h3 className="mt-2 font-serif text-2xl text-gold-gradient">Create Staff Account</h3>
 
           <div className="mt-5 space-y-4">
+            <div>
+              <Label>Account Type</Label>
+              <div className="flex gap-2 mt-2">
+                {(["staff", "co-doctor"] as const).map((r) => (
+                  <button key={r} type="button" onClick={() => setNewStaff((p) => ({ ...p, role: r }))}
+                    className={`flex-1 py-2 rounded-lg text-sm border transition ${newStaff.role === r ? "border-gold-400 bg-gold-500/10 text-gold-200" : "border-gold-500/20 text-gold-100/60 hover:border-gold-400/50"}`}>
+                    {r === "co-doctor" ? "Co-Doctor" : "Staff"}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div><Label>Full Name</Label><Input value={newStaff.name} onChange={(e) => setNewStaff((p) => ({ ...p, name: e.target.value }))} /></div>
             <div><Label>Email</Label><Input type="email" value={newStaff.email} onChange={(e) => setNewStaff((p) => ({ ...p, email: e.target.value }))} /></div>
             <div><Label>Phone</Label><Input value={newStaff.phone} onChange={(e) => setNewStaff((p) => ({ ...p, phone: e.target.value }))} /></div>
             <div><Label>Password</Label><PasswordInput value={newStaff.password} onChange={(e) => setNewStaff((p) => ({ ...p, password: e.target.value }))} placeholder="Min. 6 characters" minLength={6} /></div>
-            <div>
-              <Label>Staff Role</Label>
-              <Select value={newStaff.subRole} onChange={(e) => setNewStaff((p) => ({ ...p, subRole: e.target.value as StaffSubRole }))}>
-                {(Object.keys(SUB_ROLE_LABELS) as StaffSubRole[]).map((k) => (
-                  <option key={k} value={k}>{SUB_ROLE_LABELS[k]}</option>
-                ))}
-              </Select>
-              <p className="text-[11px] text-gold-100/40 mt-1">
-                {newStaff.subRole === "billing_specialist" && "Access: Payments only"}
-                {newStaff.subRole === "appointment_scheduler" && "Access: Appointments only"}
-                {newStaff.subRole === "general" && "Access: All modules"}
-              </p>
-            </div>
+            {newStaff.role === "staff" && (
+              <div>
+                <Label>Staff Role</Label>
+                <Select value={newStaff.subRole} onChange={(e) => setNewStaff((p) => ({ ...p, subRole: e.target.value as StaffSubRole }))}>
+                  {(Object.keys(SUB_ROLE_LABELS) as StaffSubRole[]).map((k) => (
+                    <option key={k} value={k}>{SUB_ROLE_LABELS[k]}</option>
+                  ))}
+                </Select>
+                <p className="text-[11px] text-gold-100/40 mt-1">
+                  {newStaff.subRole === "billing_specialist" && "Access: Payments only"}
+                  {newStaff.subRole === "appointment_scheduler" && "Access: Appointments only"}
+                  {newStaff.subRole === "general" && "Access: All modules"}
+                </p>
+              </div>
+            )}
+            {newStaff.role === "co-doctor" && (
+              <p className="text-xs text-gold-100/45">Co-doctors can view assigned patients, add treatment notes, and access clinical records. They cannot manage billing or settings.</p>
+            )}
           </div>
 
           <Button
@@ -127,12 +143,13 @@ export function StaffAccounts() {
               if (!newStaff.name || !newStaff.email || !newStaff.password) return;
               setCreating(true); setCreateError(""); setCreated(false);
               try {
-                const created = await authService.createStaffAccount(newStaff.name, newStaff.email, newStaff.phone, "staff", newStaff.password);
-                // Save subRole to user doc and set default permissions
-                await settingsService.updateStaffSubRole(created.id, newStaff.subRole);
-                const defaults = SUB_ROLE_DEFAULTS[newStaff.subRole];
-                settingsService.updateStaffPermission(created.id, defaults, user!.name);
-                setNewStaff({ name: "", email: "", phone: "", password: "", subRole: "general" });
+                const created = await authService.createStaffAccount(newStaff.name, newStaff.email, newStaff.phone, newStaff.role, newStaff.password);
+                if (newStaff.role === "staff") {
+                  await settingsService.updateStaffSubRole(created.id, newStaff.subRole);
+                  const defaults = SUB_ROLE_DEFAULTS[newStaff.subRole];
+                  settingsService.updateStaffPermission(created.id, defaults, user!.name);
+                }
+                setNewStaff({ name: "", email: "", phone: "", password: "", role: "staff", subRole: "general" });
                 setCreated(true);
               } catch (err: any) {
                 setCreateError(err.message || "Failed to create account.");
@@ -141,9 +158,9 @@ export function StaffAccounts() {
               }
             }}
           >
-            {creating ? "Creating..." : "Add Staff Member"}
+            {creating ? "Creating..." : `Add ${newStaff.role === "co-doctor" ? "Co-Doctor" : "Staff Member"}`}
           </Button>
-          {created && <p className="mt-3 text-sm text-emerald-400">✓ Staff account created. They can log in at /admin-login.</p>}
+          {created && <p className="mt-3 text-sm text-emerald-400">✓ Account created. They can log in at /admin-login.</p>}
           {createError && <p className="mt-3 text-sm text-red-400">{createError}</p>}
         </Card>
       </div>

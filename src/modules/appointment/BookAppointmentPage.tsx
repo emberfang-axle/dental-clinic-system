@@ -8,32 +8,51 @@ import { Logo } from "../../components/Logo";
 import { Badge, Button, Input, Label } from "../../components/ui";
 import { appointmentsService } from "../../services/appointments";
 import { calendarService } from "../../services/calendar";
+import { waitlistService } from "../../services/waitlist";
 import { useStore } from "../../store/store";
 import { BOOKING, ROUTES } from "../../shared/constants";
 import { dashboardPathFor } from "../../shared/helpers";
 
-const TIME_SLOTS = BOOKING.TIME_SLOTS;
+const SERVICE_CATEGORIES = [
+  { label: "Preventive Care",        names: ["oral consultation", "oral prophylaxis (cleaning)", "teeth whitening"] },
+  { label: "Restorative Treatments", names: ["tooth filling (pasta)", "root canal treatment", "dental crowns", "crowns and bridges", "fixed bridge", "veneers"] },
+  { label: "Orthodontics",           names: ["orthodontics (braces)", "braces adjustment"] },
+  { label: "Prosthodontics",         names: ["dentures", "removable dentures", "ivocap dentures"] },
+  { label: "Surgical / Emergency",   names: ["tooth extraction (bunot)", "odontectomy (3rd molar removal)", "emergency dental services"] },
+];
 
 export function BookAppointmentPage({ navigate }: { navigate: (p: string) => void }) {
-  const { user, services: rawServices, appointments } = useStore();
+  const { user, services: rawServices, appointments, users, doctorSchedules } = useStore();
   const services = rawServices.filter(
     (s, i, arr) => arr.findIndex((x) => x.name.toLowerCase() === s.name.toLowerCase()) === i
   );
+
+  // Active doctors from Firestore users only — no hardcoded names
+  const doctorOptions = users
+    .filter((u) => (u.role === "doctor" || u.role === "co-doctor") && u.active !== false)
+    .map((d) => ({ name: d.name, sub: d.role === "co-doctor" ? "Co-Doctor" : "Licensed Dentist" }))
+    .filter((d, i, arr) => arr.findIndex((x) => x.name === d.name) === i);
+
   const [step, setStep] = useState(1);
-  const [serviceId, setServiceId] = useState(services[0].id);
-  const [doctor] = useState("Dr. Estandarte");
+  const [serviceId, setServiceId] = useState(services[0]?.id ?? "");
+  const [doctor, setDoctor] = useState(doctorOptions[0]?.name ?? "");
   const [date, setDate] = useState(() => {
     const d = new Date(); d.setDate(d.getDate() + 1);
     return d.toISOString().slice(0, 10);
   });
   const [time, setTime] = useState("");
+  const [paymentMethod] = useState<"cash" | "gcash">("cash");
   const [emergency, setEmergency] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<"cash" | "gcash">("cash");
   const [confirmed, setConfirmed] = useState<string | null>(null);
   const [bookingError, setBookingError] = useState("");
   const [booking, setBooking] = useState(false);
 
-  const service = services.find((s) => s.id === serviceId)!;
+  const service = services.find((s) => s.id === serviceId);
+  if (!service && services.length > 0) {
+    setServiceId(services[0].id);
+    return null;
+  }
+  if (!service) return null;
 
   if (!user) {
     return (
@@ -51,9 +70,19 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
     );
   }
 
+  // Use doctor-specific slots if configured, else clinic defaults
+  const doctorSchedule = doctorSchedules.find((s) => s.doctorName === doctor);
+  const availableSlots: readonly string[] = doctorSchedule?.timeSlots?.length
+    ? doctorSchedule.timeSlots
+    : BOOKING.TIME_SLOTS;
+
   const takenTimes = appointments
     .filter((a) => a.date === date && a.status !== "cancelled")
     .map((a) => a.time);
+
+  const patientConflict = appointments.find(
+    (a) => a.patientId === user!.id && a.date === date && a.time === time && a.status !== "cancelled"
+  );
 
   function next() {
     setBookingError("");
@@ -62,6 +91,7 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
       const today = new Date().toISOString().slice(0, 10);
       if (date < today) { setBookingError("Please select a future date."); return; }
       if (new Date(date + "T00:00:00").getDay() === 0) { setBookingError("The clinic is closed on Sundays. Please pick another day."); return; }
+      if (patientConflict) { setBookingError(`You already have an appointment on ${date} at ${time}. Please choose a different time.`); return; }
     }
     setStep((s) => Math.min(s + 1, 4));
   }
@@ -86,12 +116,12 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
         patientName: user!.name,
         patientEmail: user!.email,
         patientPhone: user!.phone,
-        serviceId: service.id,
-        serviceName: service.name,
-        price: service.price,
+        serviceId: service!.id,
+        serviceName: service!.name,
+        price: service!.price,
         doctor, date, time,
         status: "pending",
-        paymentMethod: paymentMethod,
+        paymentMethod,
         paymentStatus: "unpaid" as const,
         emergency,
       });
@@ -104,6 +134,7 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
   }
 
   if (confirmed) {
+    const depositAmount = service!.requiresDeposit ? Math.ceil(service!.price * 0.3) : null;
     return (
       <Centered navigate={navigate}>
         <div className="max-w-lg w-full glass-strong rounded-2xl p-10 text-center shadow-luxe fade-up">
@@ -118,15 +149,26 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
             <span className="text-gold-300 font-medium">{time}</span> has been received.
           </p>
           <p className="text-sm text-gold-100/55 mt-3">Please arrive 10 minutes before your scheduled appointment.</p>
-            {paymentMethod === "gcash" ? (
-              <div className="mt-4 rounded-xl border border-gold-500/25 bg-gold-500/8 p-4 text-sm text-gold-100/70">
-                <span className="text-gold-300 font-medium">GCash Payment:</span> After your treatment, scan the clinic GCash QR or send to the clinic number, then submit your reference number in your <span className="text-gold-300">Payment Center</span>.
-              </div>
-            ) : (
-              <div className="mt-4 rounded-xl border border-gold-500/25 bg-gold-500/8 p-4 text-sm text-gold-100/70">
-                <span className="text-gold-300 font-medium">Cash Payment:</span> Prepare your cash on the day. Staff will collect payment after your treatment.
-              </div>
-            )}
+
+          {/* Deposit guidance for deposit-required services */}
+          {depositAmount && (
+            <div className="mt-6 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-left space-y-2">
+              <p className="text-sm font-semibold text-amber-300">⚠ Deposit Required to Confirm</p>
+              <p className="text-xs text-amber-200/80 leading-relaxed">
+                This service requires a minimum <span className="font-semibold text-amber-300">30% deposit (₱{depositAmount.toLocaleString()})</span> to secure your slot.
+              </p>
+              {paymentMethod === "gcash" ? (
+                <p className="text-xs text-amber-200/70">
+                  Send ₱{depositAmount.toLocaleString()} via GCash, then submit your reference number in the <span className="text-gold-300 font-medium">Payments</span> tab of your dashboard.
+                </p>
+              ) : (
+                <p className="text-xs text-amber-200/70">
+                  Please pay ₱{depositAmount.toLocaleString()} in cash at the clinic before your appointment date to confirm your slot.
+                </p>
+              )}
+            </div>
+          )}
+
           <div className="mt-8 flex justify-center gap-3">
             <Button onClick={() => navigate(dashboardPathFor(user.role))}>Go to Dashboard</Button>
             <Button variant="outline" onClick={() => navigate(ROUTES.home)}>Back to Home</Button>
@@ -179,30 +221,50 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
         <div className="rounded-2xl glass-strong p-4 sm:p-8 shadow-luxe fade-up">
           {step === 1 && (
             <div>
-              <h3 className="font-serif text-2xl text-gold-shine mb-1">Select a Service</h3>
-              <p className="text-sm text-gold-100/50 mb-6">Choose the treatment you'd like to book.</p>
-              <div className="grid sm:grid-cols-2 gap-3">
-                {services.map((s) => (
-                  <button key={s.id} onClick={() => setServiceId(s.id)} className={`text-left p-4 rounded-xl border transition ${serviceId === s.id ? "border-gold-400 bg-gold-500/10" : "border-gold-500/20 hover:border-gold-400/50"}`}>
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-medium text-gold-100">{s.name}</span>
-                      <span className="text-gold-300 font-mono text-sm whitespace-nowrap">
-                        ₱{s.price.toLocaleString()}{s.priceMax ? `–₱${s.priceMax.toLocaleString()}` : ""}
-                      </span>
-                    </div>
-                    <div className="text-xs text-gold-100/50 mt-1">⏱ {s.duration} min · {s.description}</div>
-                    {s.requiresDeposit && (
-                      <div className="mt-2 text-[10px] uppercase tracking-wider font-semibold text-amber-300 bg-amber-500/10 border border-amber-500/25 rounded px-1.5 py-0.5 inline-block">
-                        30–50% deposit required
-                      </div>
-                    )}
-                  </button>
-                ))}
+              <div className="text-center mb-6">
+                <h3 className="font-serif text-2xl text-gold-shine mb-1">Select a Service</h3>
+                <p className="text-sm text-gold-100/50">Choose the treatment you'd like to book.</p>
               </div>
+              {(() => {
+                const categorised = SERVICE_CATEGORIES.map((cat) => ({
+                  label: cat.label,
+                  items: services.filter((s) => cat.names.includes(s.name.toLowerCase())),
+                })).filter((c) => c.items.length > 0);
+                const categorisedNames = new Set(SERVICE_CATEGORIES.flatMap((c) => c.names));
+                const other = services.filter((s) => !categorisedNames.has(s.name.toLowerCase()));
+                if (other.length > 0) categorised.push({ label: "Other", items: other });
+                return (
+                  <div className="space-y-5">
+                    {categorised.map((cat) => (
+                      <div key={cat.label}>
+                        <p className="text-[10px] uppercase tracking-[0.3em] text-gold-400/70 font-semibold mb-2">{cat.label}</p>
+                        <div className="grid sm:grid-cols-2 gap-3">
+                          {cat.items.map((s) => (
+                            <button key={s.id} onClick={() => setServiceId(s.id)} className={`text-left p-4 rounded-xl border transition ${serviceId === s.id ? "border-gold-400 bg-gold-500/10" : "border-gold-500/20 hover:border-gold-400/50"}`}>
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="font-medium text-gold-100">{s.name}</span>
+                                <span className="text-gold-300 font-mono text-sm whitespace-nowrap">
+                                  ₱{s.price.toLocaleString()}{s.priceMax ? `–₱${s.priceMax.toLocaleString()}` : ""}
+                                </span>
+                              </div>
+                              <div className="text-xs text-gold-100/50 mt-1">{s.duration} min · {s.description}</div>
+                              {s.requiresDeposit && (
+                                <div className="mt-2 text-[10px] uppercase tracking-wider font-semibold text-amber-300 bg-amber-500/10 border border-amber-500/25 rounded px-1.5 py-0.5 inline-block">
+                                  Deposit: ₱{Math.ceil(s.price * 0.3).toLocaleString()} required
+                                </div>
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
               {service?.requiresDeposit && (
                 <div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/8 p-3 text-xs text-amber-200/80 leading-relaxed">
                   <span className="font-semibold text-amber-300">Downpayment Notice: </span>
-                  This procedure requires a minimum 30–50% downpayment to confirm your reservation. The remaining balance can be settled during or after treatment.
+                  This service requires a minimum deposit of <span className="font-semibold text-amber-300">₱{Math.ceil(service.price * 0.3).toLocaleString()}</span> (30% of ₱{service.price.toLocaleString()}) to confirm your reservation. The remaining balance of <span className="font-semibold text-amber-300">₱{(service.price - Math.ceil(service.price * 0.3)).toLocaleString()}</span> can be settled during or after treatment.
                 </div>
               )}
             </div>
@@ -210,38 +272,117 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
 
           {step === 2 && (
             <div>
-              <h3 className="font-serif text-2xl text-gold-shine mb-1">Select a Doctor</h3>
-              <p className="text-sm text-gold-100/50 mb-6">Your dental care will be in expert hands.</p>
-              <div className="p-5 rounded-xl border border-gold-400 bg-gold-500/10 flex items-center gap-4">
-                <div className="w-14 h-14 rounded-full bg-gold-gradient flex items-center justify-center text-ink-950 font-serif font-bold text-xl">DE</div>
-                <div>
-                  <div className="font-semibold text-gold-100">Dr. Estandarte</div>
-                  <div className="text-sm text-gold-100/60">Lead Dentist · Clinic Owner</div>
-                </div>
+              <div className="text-center mb-6">
+                <h3 className="font-serif text-2xl text-gold-shine mb-1">Select a Doctor</h3>
+                <p className="text-sm text-gold-100/50">Choose your preferred dentist for this appointment.</p>
+              </div>
+              <div className="space-y-3">
+                {doctorOptions.map((d) => {
+                  const initials = d.name.split(" ").filter(Boolean).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+                  const selected = doctor === d.name;
+                  return (
+                    <button
+                      key={d.name}
+                      onClick={() => setDoctor(d.name)}
+                      className={`w-full text-left p-5 rounded-xl border transition flex items-center gap-4 ${
+                        selected ? "border-gold-400 bg-gold-500/10" : "border-gold-500/20 hover:border-gold-400/50"
+                      }`}
+                    >
+                      <div className="w-14 h-14 rounded-full bg-gold-gradient flex items-center justify-center text-ink-950 font-serif font-bold text-xl shrink-0">
+                        {initials}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="font-semibold text-gold-100">{d.name}</div>
+                        <div className="text-sm text-gold-100/60">{d.sub}</div>
+                      </div>
+                      {selected && <span className="ml-auto text-gold-400 text-lg shrink-0">✓</span>}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
 
           {step === 3 && (
             <div>
-              <h3 className="font-serif text-2xl text-gold-shine mb-1">Choose Date & Time</h3>
-              <p className="text-sm text-gold-100/50 mb-6">Real-time availability synced with our calendar.</p>
+              <div className="text-center mb-6">
+                <h3 className="font-serif text-2xl text-gold-shine mb-1">Choose Date & Time</h3>
+                <p className="text-sm text-gold-100/50">Real-time availability synced with our calendar.</p>
+              </div>
               <div className="grid sm:grid-cols-2 gap-4">
                 <div>
                   <Label>Date</Label>
-                  <Input type="date" value={date} min={new Date().toISOString().slice(0, 10)} onChange={(e) => { setDate(e.target.value); setTime(""); }} />
-                  <p className="text-xs text-gold-100/50 mt-2">🗓 Mon – Sat only. Closed on Sundays.</p>
+                  <Input
+                    type="date"
+                    value={date}
+                    min={(() => { const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().slice(0, 10); })()}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (new Date(val + "T00:00:00").getDay() === 0) {
+                        setBookingError("The clinic is closed on Sundays. Please pick another day.");
+                        return;
+                      }
+                      if (calendarService.isDateBlocked(val)) {
+                        setBookingError("This date is fully blocked (clinic holiday or doctor unavailable). Please pick another day.");
+                        return;
+                      }
+                      setBookingError("");
+                      setDate(val);
+                      setTime("");
+                    }}
+                  />
+                  <p className="text-xs text-gold-100/50 mt-2">Mon–Fri: 9 AM–4 PM · Sat: 8 AM–4 PM · Closed Sundays.</p>
                 </div>
                 <div>
-                  <Label>Time Slot</Label>
+                  <Label>
+                    Time Slot
+                    <span className="ml-2 text-gold-100/40 normal-case tracking-normal font-normal">
+                      ({availableSlots.length - takenTimes.length} of {availableSlots.length} available)
+                    </span>
+                  </Label>
                   <div className="grid grid-cols-3 gap-2">
-                    {TIME_SLOTS.map((t) => {
+                    {availableSlots.map((t) => {
                       const taken = takenTimes.includes(t);
                       const selected = time === t;
+                      // Count how many bookings on this slot (for tooltip)
+                      const slotCount = appointments.filter(
+                        (a) => a.date === date && a.time === t && a.status !== "cancelled"
+                      ).length;
                       return (
-                        <button key={t} disabled={taken} onClick={() => setTime(t)} className={`px-3 py-2 rounded-lg text-sm border transition ${selected ? "bg-gold-gradient text-ink-950 border-gold-400" : taken ? "border-red-500/30 text-red-400/40 line-through cursor-not-allowed" : "border-gold-500/30 text-gold-100/80 hover:border-gold-400"}`}>
-                          {t}
-                        </button>
+                        <div key={t} className="relative group/slot">
+                          <button
+                            disabled={taken}
+                            onClick={() => setTime(t)}
+                            className={`w-full px-3 py-2 rounded-lg text-sm border transition ${
+                              selected
+                                ? "bg-gold-gradient text-ink-950 border-gold-400 font-semibold"
+                                : taken
+                                ? "border-red-500/30 text-red-400/40 line-through cursor-not-allowed bg-red-500/5"
+                                : "border-gold-500/30 text-gold-100/80 hover:border-gold-400 hover:bg-gold-500/5"
+                            }`}
+                          >
+                            {t}
+                          </button>
+                          {/* Tooltip */}
+                          {taken && (
+                            <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-20 opacity-0 group-hover/slot:opacity-100 transition-opacity duration-150">
+                              <div className="bg-ink-800 border border-red-500/40 text-red-300 text-[10px] font-semibold px-2.5 py-1.5 rounded-lg whitespace-nowrap shadow-lg">
+                                Slot Unavailable
+                                <div className="text-red-400/60 font-normal">{slotCount} booking{slotCount !== 1 ? "s" : ""} on this time</div>
+                              </div>
+                              <div className="w-2 h-2 bg-ink-800 border-r border-b border-red-500/40 rotate-45 mx-auto -mt-1" />
+                            </div>
+                          )}
+                          {/* Available tooltip on hover */}
+                          {!taken && !selected && (
+                            <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-20 opacity-0 group-hover/slot:opacity-100 transition-opacity duration-150">
+                              <div className="bg-ink-800 border border-gold-500/30 text-gold-300 text-[10px] font-semibold px-2.5 py-1.5 rounded-lg whitespace-nowrap shadow-lg">
+                                Slot Available
+                              </div>
+                              <div className="w-2 h-2 bg-ink-800 border-r border-b border-gold-500/30 rotate-45 mx-auto -mt-1" />
+                            </div>
+                          )}
+                        </div>
                       );
                     })}
                   </div>
@@ -251,48 +392,43 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
                 <input type="checkbox" checked={emergency} onChange={(e) => setEmergency(e.target.checked)} className="accent-gold-500" />
                 Mark as <span className="text-red-400 font-medium">emergency</span> (priority handling)
               </label>
+
+              {/* Waitlist — show when all slots are taken */}
+              {availableSlots.every((t) => takenTimes.includes(t)) && (
+                <div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/8 p-4 space-y-2">
+                  <p className="text-sm font-semibold text-amber-300">All slots are full for this date.</p>
+                  <p className="text-xs text-amber-200/70">Join the waitlist and we'll notify you if a slot opens up.</p>
+                  <Button size="sm" variant="outline" onClick={async () => {
+                    await waitlistService.join({
+                      patientId: user!.id,
+                      patientName: user!.name,
+                      patientEmail: user!.email,
+                      patientPhone: user!.phone,
+                      serviceId: service!.id,
+                      serviceName: service!.name,
+                      doctor,
+                      preferredDate: date,
+                    });
+                  }}>
+                    Join Waitlist for {date}
+                  </Button>
+                </div>
+              )}
             </div>
           )}
 
-            {step === 4 && (
+          {step === 4 && (
             <div>
-              <h3 className="font-serif text-2xl text-gold-shine mb-1">Review & Confirm</h3>
-              <p className="text-sm text-gold-100/50 mb-6">Please review your appointment details before confirming.</p>
+              <div className="text-center mb-6">
+                <h3 className="font-serif text-2xl text-gold-shine mb-1">Review & Confirm</h3>
+                <p className="text-sm text-gold-100/50">Please review your appointment details before confirming.</p>
+              </div>
               <div className="space-y-3 text-sm">
                 <Row label="Patient" value={user.name} />
-                <Row label="Service" value={service.name} />
+                <Row label="Service" value={service!.name} />
                 <Row label="Doctor" value={doctor} />
                 <Row label="Date & Time" value={`${date} · ${time || "—"}`} />
                 {emergency && <Row label="Priority" value={<Badge tone="emergency">EMERGENCY</Badge>} />}
-              </div>
-
-              <div className="mt-5 rounded-xl border border-amber-500/30 bg-amber-500/8 p-4 text-xs text-amber-200/80 leading-relaxed">
-                <span className="font-semibold text-amber-300">Payment Policy: </span>
-                Post-treatment payment must be settled via cash, online (GCash/bank), or installment/downpayment as agreed. Payment must be confirmed before discharge.
-              </div>
-
-              <div className="mt-6">
-                <p className="text-xs uppercase tracking-[0.2em] text-gold-300/60 mb-3">Payment Method</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <button type="button" onClick={() => setPaymentMethod("cash")} className={`p-4 rounded-xl border-2 text-left transition ${paymentMethod === "cash" ? "border-gold-400 bg-gold-500/10" : "border-gold-500/20 hover:border-gold-400/50"}`}>
-                    <div className="font-semibold text-gold-100 text-sm">Cash</div>
-                    <div className="text-xs text-gold-100/50 mt-0.5">Pay at the clinic after treatment</div>
-                  </button>
-                  <button type="button" onClick={() => setPaymentMethod("gcash")} className={`p-4 rounded-xl border-2 text-left transition ${paymentMethod === "gcash" ? "border-gold-400 bg-gold-500/10" : "border-gold-500/20 hover:border-gold-400/50"}`}>
-                    <div className="font-semibold text-gold-100 text-sm">GCash</div>
-                    <div className="text-xs text-gold-100/50 mt-0.5">Scan QR or send to clinic number</div>
-                  </button>
-                </div>
-                {paymentMethod === "gcash" && (
-                  <div className="mt-3 rounded-xl border border-gold-500/20 bg-gold-500/5 p-3 text-xs text-gold-100/60">
-                    After your treatment, scan the clinic GCash QR or send payment to the clinic number. Then submit your reference number in the Payment Center.
-                  </div>
-                )}
-                {paymentMethod === "cash" && (
-                  <div className="mt-3 rounded-xl border border-gold-500/20 bg-gold-500/5 p-3 text-xs text-gold-100/60">
-                    Prepare your cash payment on the day of your appointment. Staff will collect after treatment.
-                  </div>
-                )}
               </div>
             </div>
           )}

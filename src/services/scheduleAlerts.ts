@@ -27,11 +27,15 @@ function once(key: string, fn: () => void) {
   fn();
 }
 
+/** Guard against re-running on profile listener re-fires within the same day */
+const ranForUser = new Map<string, string>(); // userId → date
+
 export const scheduleAlertsService = {
-  /** Call after user profile loads in bootstrap */
   async runForUser(user: User) {
-    const { appointments } = getSnapshot();
     const today = todayStr();
+    if (ranForUser.get(user.id) === today) return;
+    ranForUser.set(user.id, today);
+    const { appointments } = getSnapshot();
     const tomorrow = tomorrowStr();
 
     // ── DOCTOR alerts ────────────────────────────────────────────────

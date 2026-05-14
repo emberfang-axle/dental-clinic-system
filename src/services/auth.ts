@@ -5,6 +5,7 @@
   updateProfile as updateFirebaseProfile,
   verifyBeforeUpdateEmail,
   sendPasswordResetEmail,
+  sendEmailVerification,
   signInWithRedirect,
   getRedirectResult,
   getAuth,
@@ -39,17 +40,27 @@ async function upsertGoogleUser(firebaseUser: import("firebase/auth").User): Pro
 export const authService = {
   async login(email: string, password: string) {
     const res = await signInWithEmailAndPassword(auth, normalizeEmail(email), password);
+    // Reload to get the latest emailVerified status from Firebase
+    await res.user.reload();
     return getDocTyped<User>("users", res.user.uid);
   },
 
-  async register(name: string, email: string, phone: string, password: string) {
+  async register(name: string, email: string, phone: string, password: string, firstName?: string, lastName?: string, address?: string) {
     const res = await createUserWithEmailAndPassword(auth, normalizeEmail(email), password);
     if (name?.trim()) await updateFirebaseProfile(res.user, { displayName: name.trim() });
+
+    // Send verification email — free on all Firebase plans
+    const continueUrl = window.location.origin + window.location.pathname + "#/login";
+    await sendEmailVerification(res.user, { url: continueUrl, handleCodeInApp: false });
+
     const user: User = {
       id: res.user.uid,
       name: name.trim() || "New Patient",
+      firstName: firstName?.trim(),
+      lastName: lastName?.trim(),
       email: normalizeEmail(email),
       phone: phone?.trim() || undefined,
+      address: address?.trim() || undefined,
       role: "patient" as Role,
       active: true,
     };
@@ -71,7 +82,7 @@ export const authService = {
     await signOut(auth);
   },
 
-  async createStaffAccount(name: string, email: string, phone: string, role: "staff" | "doctor", password: string) {
+  async createStaffAccount(name: string, email: string, phone: string, role: "staff" | "doctor" | "co-doctor", password: string) {
     // Use a secondary app instance so creating the account doesn't sign out the current doctor.
     const secondaryApp = initializeApp(app.options, `staff-create-${Date.now()}`);
     const secondaryAuth = getAuth(secondaryApp);
@@ -141,5 +152,9 @@ export const authService = {
   async resetPassword(email: string) {
     const continueUrl = window.location.origin + window.location.pathname + "#/login";
     await sendPasswordResetEmail(auth, email.trim().toLowerCase(), { url: continueUrl, handleCodeInApp: false });
+  },
+
+  isEmailVerified(): boolean {
+    return auth.currentUser?.emailVerified ?? false;
   },
 };

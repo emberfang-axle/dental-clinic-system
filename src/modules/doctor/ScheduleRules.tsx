@@ -22,7 +22,7 @@ export function ScheduleRules() {
   const [saved, setSaved] = useState(false);
   const [blockError, setBlockError] = useState("");
   const [blockedDate, setBlockedDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [blockedTime, setBlockedTime] = useState<string>(BOOKING.TIME_SLOTS[0]);
+  const [blockedTime, setBlockedTime] = useState<string>("all");
   const [blockedReason, setBlockedReason] = useState("Doctor unavailable");
   const [blockedSlots, setBlockedSlots] = useState(() => calendarService.listBlockedSlots());
 
@@ -35,9 +35,14 @@ export function ScheduleRules() {
 
   function handleBlock() {
     if (!blockedDate) { setBlockError("Please select a date."); return; }
-    if (!blockedTime) { setBlockError("Please select a time."); return; }
     setBlockError("");
-    calendarService.blockSlot(blockedDate, blockedTime, blockedReason.trim() || "Doctor unavailable");
+    if (blockedTime === "all") {
+      BOOKING.TIME_SLOTS.forEach((t) =>
+        calendarService.blockSlot(blockedDate, t, blockedReason.trim() || "Clinic closed")
+      );
+    } else {
+      calendarService.blockSlot(blockedDate, blockedTime, blockedReason.trim() || "Doctor unavailable");
+    }
     setBlockedSlots(calendarService.listBlockedSlots());
   }
 
@@ -104,6 +109,7 @@ export function ScheduleRules() {
             <div>
               <Label>Time</Label>
               <Select value={blockedTime} onChange={(e) => { setBlockedTime(e.target.value); setBlockError(""); }}>
+                <option value="all">All Day (Holiday / Closed)</option>
                 {BOOKING.TIME_SLOTS.map((slot) => (
                   <option key={slot} value={slot}>{slot}</option>
                 ))}
@@ -155,24 +161,34 @@ export function ScheduleRules() {
             <p className="text-sm text-gold-100/50">No blocked slots.</p>
           ) : (
             <div className="space-y-2">
-              {blockedSlots.map((slot) => (
-                <div key={`${slot.date}-${slot.time}`} className="rounded-xl border border-gold-500/15 bg-ink-900/50 p-3 flex items-center justify-between gap-3">
-                  <div>
-                    <div className="text-sm text-gold-100 font-medium">{slot.date} · {slot.time}</div>
-                    <div className="text-xs text-gold-100/50">{slot.reason || "Doctor unavailable"}</div>
+              {/* Group by date */}
+              {Array.from(new Set(blockedSlots.map((s) => s.date))).map((date) => {
+                const dateSlots = blockedSlots.filter((s) => s.date === date);
+                const isFullDay = BOOKING.TIME_SLOTS.every((t) => dateSlots.some((s) => s.time === t));
+                return (
+                  <div key={date} className="rounded-xl border border-gold-500/15 bg-ink-900/50 p-3">
+                    <div className="flex items-center justify-between gap-3 mb-2">
+                      <div>
+                        <div className="text-sm text-gold-100 font-medium">{date} {isFullDay && <span className="text-[10px] text-amber-300 bg-amber-500/15 border border-amber-500/30 rounded px-1.5 py-0.5 ml-1">All Day</span>}</div>
+                        <div className="text-xs text-gold-100/50">{dateSlots[0].reason || "Doctor unavailable"}</div>
+                      </div>
+                      <Button variant="danger" size="sm" onClick={() => { calendarService.unblockDate(date); setBlockedSlots(calendarService.listBlockedSlots()); }}>
+                        Unblock Day
+                      </Button>
+                    </div>
+                    {!isFullDay && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {dateSlots.map((slot) => (
+                          <div key={slot.time} className="flex items-center gap-1 text-xs bg-ink-800 border border-gold-500/15 rounded px-2 py-1">
+                            <span className="text-gold-100/70">{slot.time}</span>
+                            <button onClick={() => { calendarService.unblockSlot(slot.date, slot.time); setBlockedSlots(calendarService.listBlockedSlots()); }} className="text-red-400/60 hover:text-red-400 ml-1">✕</button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  <Button
-                    variant="danger"
-                    size="sm"
-                    onClick={() => {
-                      calendarService.unblockSlot(slot.date, slot.time);
-                      setBlockedSlots(calendarService.listBlockedSlots());
-                    }}
-                  >
-                    Delete
-                  </Button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </Card>

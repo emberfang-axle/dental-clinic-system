@@ -16,7 +16,7 @@ export function AdminLoginPage({ navigate }: { navigate: (p: string) => void }) 
   const { user } = useStore();
 
   useEffect(() => {
-    if (user && (user.role === "admin" || user.role === "doctor" || user.role === "staff")) {
+    if (user && (user.role === "admin" || user.role === "doctor" || user.role === "co-doctor" || user.role === "staff")) {
       navigate(dashboardPathFor(user.role));
     }
   }, [user, navigate]);

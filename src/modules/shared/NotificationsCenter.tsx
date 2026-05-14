@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { Badge, Button, Card } from "../../components/ui";
+import { Badge, Button, Card, EmptyState } from "../../components/ui";
 import { notificationsService } from "../../services/notifications";
 import { useStore } from "../../store/store";
 import { formatDateTime } from "../../shared/helpers";
@@ -18,8 +18,10 @@ export function NotificationsCenter() {
     .filter((n) => n.userId === user.id)
     .sort((a, b) => b.at.localeCompare(a.at));
 
-  const handleMarkRead = useCallback((notificationId: string) => {
-    notificationsService.markRead(notificationId);
+  const unreadCount = mine.filter((n) => !n.read).length;
+
+  const handleMarkRead = useCallback((id: string) => {
+    notificationsService.markRead(id);
   }, []);
 
   const handleMarkAllRead = useCallback(() => {
@@ -27,61 +29,60 @@ export function NotificationsCenter() {
   }, [user.id]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" aria-label="Notifications">
       <Card>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <div className="text-[10px] uppercase tracking-[0.26em] text-gold-300/55">Notifications</div>
-            <h3 className="font-serif text-2xl text-gold-gradient mt-1">Reminders, Payment Updates & Schedule Alerts</h3>
+            <h3 className="font-serif text-2xl text-gold-gradient mt-1">
+              Reminders & Updates
+              {unreadCount > 0 && (
+                <span className="ml-3 text-sm font-sans font-normal text-gold-300/70">({unreadCount} unread)</span>
+              )}
+            </h3>
           </div>
-          <Button variant="outline" size="sm" onClick={handleMarkAllRead}>
-            Mark All as Read
-          </Button>
+          {unreadCount > 0 && (
+            <Button variant="outline" size="sm" onClick={handleMarkAllRead}>
+              Mark All as Read
+            </Button>
+          )}
         </div>
       </Card>
 
-      <div className="space-y-3">
+      <div className="space-y-3" role="list">
+        {mine.length === 0 && (
+          <Card>
+            <EmptyState icon="🔔" title="No notifications yet" subtitle="You'll see appointment updates and reminders here." />
+          </Card>
+        )}
         {mine.map((n) => (
-          <Card key={n.id} className={n.read ? "opacity-80" : "border-gold-500/30"}>
+          <div key={n.id} role="listitem">
+            <Card className={n.read ? "opacity-70" : "border-gold-500/30"}>
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
+              <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h4 className="font-medium text-gold-100">{n.title}</h4>
-                  <Badge 
-                    tone={
-                      n.kind === "payment" 
-                        ? "confirmed" 
-                        : n.kind === "appointment" 
-                        ? "pending" 
-                        : "neutral"
-                    }
+                  <Badge
+                    tone={n.kind === "payment" ? "confirmed" : n.kind === "appointment" ? "pending" : "neutral"}
                   >
                     {n.kind}
                   </Badge>
-                  {!n.read && <Badge tone="paid">Unread</Badge>}
+                  {!n.read && <span className="w-2 h-2 rounded-full bg-gold-400 inline-block" aria-label="Unread" />}
                 </div>
                 <p className="mt-2 text-sm text-gold-100/65 leading-relaxed">{n.message}</p>
-                <div className="mt-2 text-[11px] uppercase tracking-[0.2em] text-gold-300/45">
+                <time className="mt-2 block text-[11px] uppercase tracking-[0.2em] text-gold-300/45" dateTime={n.at}>
                   {formatDateTime(n.at)}
-                </div>
+                </time>
               </div>
               {!n.read && (
-                <Button 
-                  size="sm" 
-                  variant="ghost" 
-                  onClick={() => handleMarkRead(n.id)}
-                >
-                  Mark Read
+                <Button size="sm" variant="ghost" onClick={() => handleMarkRead(n.id)} aria-label="Mark as read">
+                  ✓ Read
                 </Button>
               )}
             </div>
           </Card>
+          </div>
         ))}
-        {mine.length === 0 && (
-          <Card>
-            <p className="text-sm text-gold-100/60">You have no notifications yet.</p>
-          </Card>
-        )}
       </div>
 
       {announcements.length > 0 && (
@@ -90,7 +91,7 @@ export function NotificationsCenter() {
           <div className="space-y-3">
             {announcements.map((a: any) => (
               <div key={a.id} className={`glass rounded-xl p-5 border ${a.pinned ? "border-gold-400/40" : "border-gold-500/15"}`}>
-                {a.pinned && <span className="text-[10px] uppercase tracking-wider text-gold-400 font-semibold">📌 Pinned · </span>}
+                {a.pinned && <span className="text-[10px] uppercase tracking-wider text-gold-400 font-semibold">Pinned · </span>}
                 <span className="font-semibold text-gold-100">{a.title}</span>
                 <p className="text-sm text-gold-100/65 mt-2 leading-relaxed">{a.body}</p>
                 <p className="text-[10px] text-gold-100/40 mt-2">{a.author} · {new Date(a.at).toLocaleString()}</p>
@@ -102,4 +103,3 @@ export function NotificationsCenter() {
     </div>
   );
 }
-

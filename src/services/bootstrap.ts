@@ -1,8 +1,8 @@
 ﻿import { onAuthStateChanged } from "firebase/auth";
-import type { ClinicSettings, StaffPermission, User, Appointment, NotificationEntry, FeedbackEntry, Service, AuditLog } from "../shared/types";
+import type { ClinicSettings, DoctorSchedule, StaffPermission, User, Appointment, NotificationEntry, FeedbackEntry, Service, AuditLog, WaitlistEntry } from "../shared/types";
 import { auth } from "./firebase";
 import { listenCollection, listenDoc, listCollection, setDocTyped, deleteDocTyped, qOrderBy, qWhere } from "./firestore";
-import { resetState, setState, getSnapshot } from "../store/store";
+import { resetState, setState, getSnapshot, showToast } from "../store/store";
 import { scheduleAlertsService } from "./scheduleAlerts";
 
 const DEFAULT_SERVICES: Omit<Service, "id">[] = [
@@ -23,6 +23,10 @@ const DEFAULT_SERVICES: Omit<Service, "id">[] = [
   { name: "Odontectomy (3rd Molar Removal)", price: 5500, duration: 90, description: "Surgical removal of impacted third molar (wisdom teeth)." },
   { name: "Veneers",                       price: 6500,  duration: 90, description: "Cosmetic porcelain shells per tooth for a perfect, natural-looking smile.", requiresDeposit: true },
   { name: "Emergency Dental Services",     price: 1000,  duration: 30, description: "Priority care for urgent dental pain, trauma, or infections." },
+  { name: "Retainers",                     price: 3500,  duration: 30, description: "Custom retainers to maintain teeth alignment after orthodontic treatment." },
+  { name: "Porcelain Crowns",              price: 9000,  duration: 60, description: "Natural-looking porcelain crowns for damaged or weakened teeth.", requiresDeposit: true },
+  { name: "Zirconia Crowns",               price: 12000, duration: 60, description: "Durable, metal-free zirconia crowns for superior strength and aesthetics.", requiresDeposit: true },
+  { name: "Fluoride Application & Sealants", price: 500, duration: 30, description: "Preventive fluoride treatment and sealants to protect teeth from decay." },
 ];
 
 async function seedServices() {
@@ -76,7 +80,9 @@ export function bootstrapRealtime() {
       if (x.pinned && !y.pinned) return -1;
       if (!x.pinned && y.pinned) return 1;
       return y.at.localeCompare(x.at);
-    }) }))
+    }) })),
+    listenCollection<WaitlistEntry>("waitlist", (w) => setState({ waitlist: [...w].sort((a, b) => b.createdAt.localeCompare(a.createdAt)) })),
+    listenCollection<DoctorSchedule>("doctorSchedules", (d) => setState({ doctorSchedules: d }))
   );
 
   const unsubAuth = onAuthStateChanged(auth, (firebaseUser) => {
@@ -102,11 +108,22 @@ export function bootstrapRealtime() {
       return;
     }
 
+    let welcomeShown = false;
+
     // Profile
     unsubProfile = listenDoc<User>("users", firebaseUser.uid, (profile) => {
       setState({ user: profile as any });
       attachRoleListeners(profile?.role ?? null);
-      if (profile) setTimeout(() => scheduleAlertsService.runForUser(profile), 3000);
+      if (profile) {
+        if (!welcomeShown) {
+          welcomeShown = true;
+          const label =
+            profile.role === "staff"  ? `${profile.name} (Staff)` :
+            profile.name;
+          setTimeout(() => showToast(`Welcome back, ${label}!`, "success", 3500), 500);
+        }
+        setTimeout(() => scheduleAlertsService.runForUser(profile), 3000);
+      }
     });
 
     // Notifications — where only, no orderBy → no composite index needed

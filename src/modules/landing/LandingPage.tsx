@@ -1,14 +1,17 @@
-/**
- * Public landing page — STRICTLY isolated from any dashboard logic.
- * Visible to anyone, no authentication required.
- */
-
 import { useEffect, useState } from "react";
 import { Logo, LogoMark } from "../../components/Logo";
 import { Button, Card, Section, Ornament } from "../../components/ui";
 import { useStore } from "../../store/store";
 import { CLINIC, ROUTES } from "../../shared/constants";
 import { dashboardPathFor } from "../../shared/helpers";
+
+const SERVICE_CATEGORIES = [
+  { label: "Preventive Care",        names: ["oral consultation", "oral prophylaxis (cleaning)", "teeth whitening"] },
+  { label: "Restorative Treatments", names: ["tooth filling (pasta)", "root canal treatment", "dental crowns", "crowns and bridges", "fixed bridge", "veneers"] },
+  { label: "Orthodontics",           names: ["orthodontics (braces)", "braces adjustment"] },
+  { label: "Prosthodontics",         names: ["dentures", "removable dentures", "ivocap dentures"] },
+  { label: "Surgical / Emergency",   names: ["tooth extraction (bunot)", "odontectomy (3rd molar removal)", "emergency dental services"] },
+];
 
 const NAV_LINKS = [
   { label: "Home",     id: "home" },
@@ -28,11 +31,21 @@ export function LandingPage({ navigate }: { navigate: (p: string) => void }) {
   const [mobileMenu, setMobileMenu] = useState(false);
   const [showAllServices, setShowAllServices] = useState(false);
 
-  // Deduplicate by name (case-insensitive), keep first occurrence
-  const uniqueServices = services.filter(
-    (s, i, arr) => arr.findIndex((x) => x.name.toLowerCase() === s.name.toLowerCase()) === i
-  );
-  const displayedServices = showAllServices ? uniqueServices : uniqueServices.slice(0, 3);
+  // Deduplicate by name (case-insensitive)
+  const uniqueServices = services
+    .filter((s, i, arr) => arr.findIndex((x) => x.name.toLowerCase() === s.name.toLowerCase()) === i);
+
+  // Group into categories
+  const categorised = SERVICE_CATEGORIES.map((cat) => ({
+    label: cat.label,
+    items: uniqueServices.filter((s) => cat.names.includes(s.name.toLowerCase())),
+  })).filter((c) => c.items.length > 0);
+  const categorisedNames = new Set(SERVICE_CATEGORIES.flatMap((c) => c.names));
+  const other = uniqueServices.filter((s) => !categorisedNames.has(s.name.toLowerCase()));
+  if (other.length > 0) categorised.push({ label: "Other", items: other });
+
+  // Flat list for "show less" toggle — first 2 categories visible by default
+  const visibleCategories = showAllServices ? categorised : categorised.slice(0, 2);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -104,7 +117,7 @@ export function LandingPage({ navigate }: { navigate: (p: string) => void }) {
       {/* HERO */}
       <section id="home" className="relative min-h-[70vh] flex items-center overflow-hidden pt-20">
         <div className="absolute inset-0">
-          <img src="/images/hero-dental.jpg" alt="" className="absolute inset-0 w-full h-full opacity-35" style={{ objectFit: "contain", objectPosition: "center center" }} />
+          <img src="/images/hero-dental.jpg" alt="" className="absolute inset-0 w-full h-full opacity-35" style={{ objectFit: "cover", objectPosition: "center center" }} />
           <div className="absolute inset-0 bg-linear-to-r from-ink-950 via-ink-950/80 to-ink-950/30" />
           <div className="absolute inset-0 bg-linear-to-t from-ink-950 via-transparent to-ink-950/60" />
           <div className="absolute inset-0 pattern-grid opacity-40" />
@@ -253,43 +266,46 @@ export function LandingPage({ navigate }: { navigate: (p: string) => void }) {
         title={<>Treatments crafted with <span className="font-script italic">precision.</span></>}
         subtitle="From routine cleanings to bespoke cosmetic transformations — every procedure is delivered with the highest standard of care."
       >
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 stagger">
-          {displayedServices.map((s) => (
-            <div key={s.id} className="group relative rounded-xl overflow-hidden glass hover:border-gold-400/50 transition-all duration-500 hover:-translate-y-2 hover:shadow-luxe">
-              <div className="p-7">
-                <div className="flex items-start justify-between gap-4 mb-5">
-                  <h3 className="font-serif text-2xl text-gold-shine leading-tight max-w-48">{s.name}</h3>
-                  <div className="text-right shrink-0">
-                    <div className="text-[9px] uppercase tracking-[0.25em] text-gold-300/60 mb-0.5">Duration</div>
-                    <div className="text-sm text-gold-200">{s.duration} min</div>
-                  </div>
-                </div>
-                <p className="text-sm text-gold-100/55 leading-relaxed mb-5 min-h-10">{s.description}</p>
-                <div className="flex items-end justify-between pt-4 border-t border-gold-500/15">
-                  <div>
-                    <div className="text-[9px] uppercase tracking-[0.25em] text-gold-300/60 mb-0.5">
-                      {s.priceMax ? "Starting at" : "Price"}
+        <div className="space-y-8">
+          {visibleCategories.map((cat) => (
+            <div key={cat.label}>
+              <p className="text-[10px] uppercase tracking-[0.3em] text-gold-400/70 font-semibold mb-4">{cat.label}</p>
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                {cat.items.map((s) => (
+                  <div key={s.id} className="group relative rounded-xl overflow-hidden glass hover:border-gold-400/50 transition-all duration-500 hover:-translate-y-2 hover:shadow-luxe">
+                    <div className="p-6">
+                      <h3 className="font-serif text-xl text-gold-shine leading-tight mb-3">{s.name}</h3>
+                      <p className="text-sm text-gold-100/55 leading-relaxed mb-4 min-h-10">{s.description}</p>
+                      <div className="flex items-end justify-between pt-4 border-t border-gold-500/15">
+                        <div>
+                          <div className="text-[9px] uppercase tracking-[0.25em] text-gold-300/60 mb-0.5">{s.priceMax ? "Starting at" : "Price"}</div>
+                          <div className="font-serif text-xl text-gold-shine">
+                            ₱{s.price.toLocaleString()}
+                            {s.priceMax && <span className="text-base"> – ₱{s.priceMax.toLocaleString()}</span>}
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <div className="text-[9px] uppercase tracking-[0.25em] text-gold-300/60 mb-0.5">Duration</div>
+                          <div className="text-sm text-gold-200">{s.duration} min</div>
+                        </div>
+                      </div>
+                      {s.requiresDeposit && (
+                        <span className="mt-3 inline-block text-[9px] uppercase tracking-wider font-semibold text-amber-300 bg-amber-500/15 border border-amber-500/30 rounded px-2 py-0.5">
+                          Deposit Required
+                        </span>
+                      )}
+                      <button onClick={() => navigate(ROUTES.book)} className="mt-4 w-full text-center text-xs uppercase tracking-[0.2em] text-gold-300 hover:text-gold-100 py-2.5 border border-gold-500/20 hover:border-gold-400 rounded-md transition-all font-medium opacity-70 group-hover:opacity-100">
+                        Book This Service →
+                      </button>
                     </div>
-                    <div className="font-serif text-2xl text-gold-shine">
-                      ₱{s.price.toLocaleString()}
-                      {s.priceMax && <span className="text-lg"> – ₱{s.priceMax.toLocaleString()}</span>}
-                    </div>
                   </div>
-                  {s.requiresDeposit && (
-                    <span className="text-[9px] uppercase tracking-wider font-semibold text-amber-300 bg-amber-500/15 border border-amber-500/30 rounded px-2 py-1">
-                      Deposit Req.
-                    </span>
-                  )}
-                </div>
-                <button onClick={() => navigate(ROUTES.book)} className="mt-5 w-full text-center text-xs uppercase tracking-[0.2em] text-gold-300 hover:text-gold-100 py-3 border border-gold-500/20 hover:border-gold-400 rounded-md transition-all font-medium opacity-70 group-hover:opacity-100">
-                  Book This Service →
-                </button>
+                ))}
               </div>
             </div>
           ))}
         </div>
         <div className="mt-8 flex flex-wrap justify-center gap-3">
-          {uniqueServices.length > 3 && (
+          {categorised.length > 2 && (
             <Button variant="outline" onClick={() => setShowAllServices((v) => !v)}>
               {showAllServices ? "Show Less" : "View All Services"}
             </Button>
@@ -334,7 +350,7 @@ export function LandingPage({ navigate }: { navigate: (p: string) => void }) {
       {/* CONTACT */}
       <Section id="contact" eyebrow="Get In Touch" title={<>Visit our <span className="font-script italic">sanctuary.</span></>} subtitle="We'd love to welcome you. Reach out anytime through the channels below.">
         <div className="grid md:grid-cols-3 gap-5 stagger mb-10">
-          <ContactCard label="Address" primary="Compostela" secondary="Davao de Oro, Philippines" />
+          <ContactCard label="Address" primary="Purok 12 J.P Laurel St., Poblacion" secondary="Compostela, Davao de Oro (in front of Trubank)" />
           <ContactCard label="Phone" primary={CLINIC.phone} secondary={CLINIC.hours} />
           <ContactCard label="Email" primary={CLINIC.email} secondary="Replies within 24 hours" />
         </div>

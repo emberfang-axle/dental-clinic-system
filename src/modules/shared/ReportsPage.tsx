@@ -1,12 +1,37 @@
+import { useState } from "react";
 import { Card, StatCard } from "../../components/ui";
 import { useStore } from "../../store/store";
 import { BOOKING } from "../../shared/constants";
 import type { Appointment, Service, FeedbackEntry } from "../../shared/types";
 
+function exportCSV(rows: Record<string, string | number>[], filename: string) {
+  if (rows.length === 0) return;
+  const headers = Object.keys(rows[0]);
+  const csv = [
+    headers.join(","),
+    ...rows.map((r) => headers.map((h) => JSON.stringify(r[h] ?? "")).join(",")),
+  ].join("\n");
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
 export function ReportsPage() {
-  const { appointments, services, feedbacks } = useStore() as {
+  const { appointments: allAppointments, services, feedbacks } = useStore() as {
     appointments: Appointment[]; services: Service[]; feedbacks: FeedbackEntry[]; users: any[];
   };
+
+  const [filterMonth, setFilterMonth] = useState(""); // "" = all time, else "YYYY-MM"
+
+  const appointments = filterMonth
+    ? allAppointments.filter((a) => a.date.startsWith(filterMonth))
+    : allAppointments;
+
+  const monthOptions = Array.from(
+    new Set(allAppointments.map((a) => a.date.slice(0, 7)))
+  ).sort().reverse();
 
   const paid = appointments.filter((a) => a.paymentStatus === "paid");
   const completed = appointments.filter((a) => a.status === "completed");
@@ -71,11 +96,54 @@ export function ReportsPage() {
 
   return (
     <div className="space-y-6">
+      {/* Export toolbar */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-[10px] uppercase tracking-[0.26em] text-gold-300/55">Analytics & Reports</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            value={filterMonth}
+            onChange={(e) => setFilterMonth(e.target.value)}
+            className="text-xs px-3 py-1.5 rounded-lg border border-gold-500/30 bg-ink-900 text-gold-200 focus:outline-none focus:border-gold-400"
+          >
+            <option value="">All Time</option>
+            {monthOptions.map((m) => (
+              <option key={m} value={m}>{m}</option>
+            ))}
+          </select>
+          <button
+            onClick={() => exportCSV(
+              appointments.map((a) => ({
+                Date: a.date, Time: a.time, Patient: a.patientName, Service: a.serviceName,
+                Doctor: a.doctor, Status: a.status, Payment: a.paymentStatus,
+                Method: a.paymentMethod, Amount: a.price, Reference: a.gcashRef || "",
+              })),
+              `appointments-${new Date().toISOString().slice(0,10)}.csv`
+            )}
+            className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-gold-500/30 text-gold-300 hover:bg-gold-500/10 hover:text-gold-100 transition"
+          >
+            ↓ Export Appointments
+          </button>
+          <button
+            onClick={() => exportCSV(
+              paid.map((a) => ({
+                Date: a.date, Patient: a.patientName, Service: a.serviceName,
+                Method: a.paymentMethod, Reference: a.gcashRef || "", Amount: a.price,
+                Receipt: a.receiptNumber || "",
+              })),
+              `revenue-${new Date().toISOString().slice(0,10)}.csv`
+            )}
+            className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-gold-500/30 text-gold-300 hover:bg-gold-500/10 hover:text-gold-100 transition"
+          >
+            ↓ Export Revenue
+          </button>
+        </div>
+      </div>
+
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-        <StatCard icon="💰" label="Total Revenue"      value={`₱${revenue.toLocaleString()}`}  sub={`₱${pendingRevenue.toLocaleString()} pending`} />
-        <StatCard icon="📋" label="Total Appointments" value={appointments.length.toString()}   sub={`${pending.length} pending · ${noShow.length} no-show`} />
-        <StatCard icon="✅" label="Completion Rate"    value={`${completionRate}%`}             sub={`${completed.length} completed · ${cancelled.length} cancelled`} />
-        <StatCard icon="⭐" label="Avg Rating"         value={avgRating}                        sub={`${feedbacks.length} review${feedbacks.length !== 1 ? "s" : ""}`} />
+        <StatCard icon="₱" label="Total Revenue"      value={`₱${revenue.toLocaleString()}`}  sub={`₱${pendingRevenue.toLocaleString()} pending`} />
+        <StatCard icon="#" label="Total Appointments" value={appointments.length.toString()}   sub={`${pending.length} pending · ${noShow.length} no-show`} />
+        <StatCard icon="%" label="Completion Rate"    value={`${completionRate}%`}             sub={`${completed.length} completed · ${cancelled.length} cancelled`} />
+        <StatCard icon="★" label="Avg Rating"         value={avgRating}                        sub={`${feedbacks.length} review${feedbacks.length !== 1 ? "s" : ""}`} />
       </div>
 
       <div className="grid sm:grid-cols-3 gap-4">

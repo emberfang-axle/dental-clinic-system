@@ -3,7 +3,7 @@
  * Used across modules, services and components.
  */
 
-export type Role = "admin" | "doctor" | "staff" | "patient";
+export type Role = "admin" | "doctor" | "co-doctor" | "staff" | "patient";
 export type StaffSubRole = "billing_specialist" | "appointment_scheduler" | "general";
 
 export interface MedicalHistory {
@@ -16,10 +16,13 @@ export interface MedicalHistory {
 export interface User {
   id: string;
   name: string;
+  firstName?: string;
+  lastName?: string;
   email: string;
   role: Role;
   subRole?: StaffSubRole;
   phone?: string;
+  address?: string;
   active?: boolean;
   medicalHistory?: MedicalHistory;
 }
@@ -51,6 +54,7 @@ export type PaymentStatus =
   | "paid";
 
 export type PaymentMethod = "gcash" | "cash";
+export type AppointmentSource = "online" | "facebook" | "sms" | "walk-in";
 
 export interface Appointment {
   id: string;
@@ -60,14 +64,16 @@ export interface Appointment {
   patientPhone?: string;
   serviceId: string;
   serviceName: string;
-  price: number; // locked at booking time
+  price: number;
   doctor: string;
-  date: string; // YYYY-MM-DD
-  time: string; // HH:MM
+  date: string;
+  time: string;
   status: AppointmentStatus;
   paymentMethod: PaymentMethod;
   paymentStatus: PaymentStatus;
+  source?: AppointmentSource;
   gcashRef?: string;
+  gcashScreenshotUrl?: string;
   paymentScreenshotUrl?: string;
   depositAmount?: number;
   depositPaidAt?: string;
@@ -75,14 +81,36 @@ export interface Appointment {
   diagnosis?: string;
   treatmentPlan?: string;
   dentalHistory?: string;
+  toothChart?: Record<string, string>; // toothNumber → condition
   beforeImageUrl?: string;
   afterImageUrl?: string;
   supportNote?: string;
   receiptNumber?: string;
   calendarEventId?: string;
   emergency?: boolean;
+  rescheduledAt?: string;
   createdAt: string;
   updatedAt?: string;
+}
+
+export interface WaitlistEntry {
+  id: string;
+  patientId: string;
+  patientName: string;
+  patientEmail?: string;
+  patientPhone?: string;
+  serviceId: string;
+  serviceName: string;
+  doctor: string;
+  preferredDate: string;
+  createdAt: string;
+}
+
+/** Per-doctor schedule overrides. If absent, clinic defaults apply. */
+export interface DoctorSchedule {
+  doctorName: string;
+  timeSlots: string[];       // e.g. ["09:00","10:00"]
+  blockedDates: string[];    // YYYY-MM-DD
 }
 
 export interface AuditLog {

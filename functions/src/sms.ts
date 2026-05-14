@@ -1,4 +1,6 @@
 import {onDocumentCreated, onDocumentUpdated} from "firebase-functions/v2/firestore";
+import {onSchedule} from "firebase-functions/v2/scheduler";
+import * as admin from "firebase-admin";
 import * as logger from "firebase-functions/logger";
 
 const SEMAPHORE_URL = "https://api.semaphore.co/api/v4/messages";
@@ -80,5 +82,70 @@ export const appointmentSms = onDocumentUpdated(
         `Hi ${after.patientName}! Your ${after.serviceName} appointment has been rescheduled to ${after.date} at ${after.time}. Please arrive 10 mins early. - Estandarte Dental`
       );
     }
+  }
+);
+
+/**
+ * Fires when a new announcement is created.
+ * Sends the announcement to all patients who have a phone number.
+ */
+export const announcementSms = onDocumentCreated(
+  {document: "announcements/{id}", secrets: ["SEMAPHORE_API_KEY"]},
+  async (event) => {
+    const data = event.data?.data();
+    if (!data) return;
+
+    const db = admin.firestore();
+    const patientsSnap = await db.collection("users").where("role", "==", "patient").get();
+    if (patientsSnap.empty) return;
+
+    await Promise.all(
+      patientsSnap.docs.map((d) => {
+        const phone: string | undefined = d.data().phone;
+        if (!phone) return Promise.resolve();
+        return sendSms(phone,
+          `[Estandarte Dental] ${data.title}: ${data.body.slice(0, 120)}${data.body.length > 120 ? "..." : ""}`
+        );
+      })
+    );
+  }
+);
+
+/**
+ * Runs every day at 8 AM Philippine Time.
+ * Sends a 24-hour reminder SMS to patients with appointments tomorrow.
+ */
+export const appointmentReminderSms = onSchedule(
+  {schedule: "0 0 * * *", timeZone: "Asia/Manila", secrets: ["SEMAPHORE_API_KEY"]},
+  async () => {
+    const db = admin.firestore();
+
+    const now = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Manila"}));
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = tomorrow.toISOString().slice(0, 10);
+
+    const snap = await db.collection("appointments")
+      .where("date", "==", tomorrowStr)
+      .where("status", "in", ["confirmed", "pending"])
+      .get();
+
+    if (snap.empty) {
+      logger.info(`No SMS reminders for ${tomorrowStr}`);
+      return;
+    }
+
+    await Promise.all(
+      snap.docs.map((d) => {
+        const appt = d.data();
+        const phone: string | undefined = appt.patientPhone;
+        if (!phone) return Promise.resolve();
+        return sendSms(phone,
+          `Hi ${appt.patientName}! Reminder: ${appt.serviceName} appointment tomorrow ${appt.date} at ${appt.time}. Please arrive 10 mins early. - Estandarte Dental`
+        );
+      })
+    );
+
+    logger.info(`Sent ${snap.size} SMS reminder(s) for ${tomorrowStr}`);
   }
 );

@@ -3,12 +3,14 @@ import type {
   Appointment,
   AuditLog,
   ClinicSettings,
+  DoctorSchedule,
   FeedbackEntry,
   NotificationEntry,
   Service,
   StaffPermission,
   User,
   Announcement,
+  WaitlistEntry,
 } from "../shared/types";
 
 export interface ToastEntry {
@@ -30,6 +32,8 @@ export interface AppState {
   staffPermissions: StaffPermission[];
   announcements: Announcement[];
   toasts: ToastEntry[];
+  waitlist: WaitlistEntry[];
+  doctorSchedules: DoctorSchedule[];
 }
 
 let state: AppState = {
@@ -45,6 +49,8 @@ let state: AppState = {
   staffPermissions: [],
   announcements: [],
   toasts: [],
+  waitlist: [],
+  doctorSchedules: [],
 };
 
 type Listener = () => void;
@@ -78,6 +84,8 @@ export function resetState() {
     staffPermissions: [],
     announcements: [],
     toasts: [],
+    waitlist: [],
+    doctorSchedules: [],
   };
   listeners.forEach((l) => l());
 }

@@ -1,13 +1,20 @@
 import type { Appointment } from "../shared/types";
 import { getSnapshot, setState, showToast } from "../store/store";
-import { updateDocTyped, deleteDocTyped, collection, doc, db } from "./firestore";
-import { setDoc } from "firebase/firestore";
+import { updateDocTyped, deleteDocTyped, collection, doc, db, runTransaction } from "./firestore";
+import { getDocs, query, where } from "firebase/firestore";
 import { calendarService } from "./calendar";
 import { notificationsService } from "./notifications";
 
 function nowISO() { return new Date().toISOString(); }
 function makeId(prefix: string) {
   return `${prefix}_${Math.random().toString(16).slice(2)}_${Date.now().toString(16)}`;
+}
+
+/** Remove undefined values so Firestore never receives them. */
+function stripUndefined<T extends object>(obj: T): T {
+  return Object.fromEntries(
+    Object.entries(obj).filter(([, v]) => v !== undefined)
+  ) as T;
 }
 
 function addLog(actor: string, action: string, target: string, before?: Partial<Appointment>, after?: Partial<Appointment>) {
@@ -23,6 +30,10 @@ function addLog(actor: string, action: string, target: string, before?: Partial<
 
 export type NewAppointment = Omit<Appointment, "id" | "createdAt" | "updatedAt">;
 
+function sanitizeStr(s: string, max = 200): string {
+  return s.trim().slice(0, max);
+}
+
 export const appointmentsService = {
   isSlotTaken(date: string, time: string) {
     const { appointments } = getSnapshot();
@@ -30,34 +41,51 @@ export const appointmentsService = {
   },
 
   async book(input: NewAppointment) {
-    if (calendarService.isSlotBlocked(input.date, input.time)) {
+    const sanitized: NewAppointment = {
+      ...input,
+      patientName: sanitizeStr(input.patientName, 100),
+      notes:         input.notes         ? sanitizeStr(input.notes, 1000)         : undefined,
+      diagnosis:     input.diagnosis     ? sanitizeStr(input.diagnosis, 1000)     : undefined,
+      treatmentPlan: input.treatmentPlan ? sanitizeStr(input.treatmentPlan, 1000) : undefined,
+    };
+    if (!sanitized.patientName) throw new Error("Patient name is required.");
+
+    if (calendarService.isSlotBlocked(sanitized.date, sanitized.time)) {
       throw new Error("Selected schedule is blocked in calendar.");
-    }
-    if (this.isSlotTaken(input.date, input.time)) {
-      throw new Error("This time slot was just taken. Please pick another.");
     }
 
     const now = nowISO();
     const newRef = doc(collection(db, "appointments"));
-    const data = { ...input, id: newRef.id, createdAt: now, updatedAt: now };
+    const data = stripUndefined({ ...sanitized, id: newRef.id, createdAt: now, updatedAt: now });
 
-    await setDoc(newRef, data);
+    // Transactional slot claim — prevents two simultaneous bookings on the same slot
+    await runTransaction(db, async (tx) => {
+      const existing = await getDocs(
+        query(collection(db, "appointments"),
+          where("date", "==", sanitized.date),
+          where("time", "==", sanitized.time)
+        )
+      );
+      const taken = existing.docs.some((d) => d.data().status !== "cancelled");
+      if (taken) throw new Error("This time slot was just taken. Please pick another.");
+      tx.set(newRef, data);
+    });
 
     const calendarEventId = await calendarService.createBookingEvent({
-      patientName: input.patientName, serviceName: input.serviceName,
-      doctor: input.doctor, date: input.date, time: input.time,
+      patientName: sanitized.patientName, serviceName: sanitized.serviceName,
+      doctor: sanitized.doctor, date: sanitized.date, time: sanitized.time,
     });
     if (calendarEventId) {
       await updateDocTyped("appointments", newRef.id, { calendarEventId } as any);
     }
 
     const ap: Appointment = { ...data, calendarEventId };
-    addLog(input.patientName, "Booked appointment", `${ap.serviceName} (${ap.date} ${ap.time})`, undefined, { status: ap.status, date: ap.date, time: ap.time });
+    addLog(sanitized.patientName, "Booked appointment", `${ap.serviceName} (${ap.date} ${ap.time})`, undefined, { status: ap.status, date: ap.date, time: ap.time });
     showToast(`Appointment booked for ${ap.date} at ${ap.time}.`, "success");
 
     await notificationsService.notifyStaff(
       "New Appointment Booked",
-      `${input.patientName} booked ${input.serviceName} on ${input.date} at ${input.time}. Please review and confirm.`,
+      `${sanitized.patientName} booked ${sanitized.serviceName} on ${sanitized.date} at ${sanitized.time}. Please review and confirm.`,
       "appointment"
     );
     return ap;
@@ -90,7 +118,7 @@ export const appointmentsService = {
   async rescheduleAndNotify(id: string, newDate: string, newTime: string, actor: string) {
     const { appointments, users } = getSnapshot();
     const appt = appointments.find((a) => a.id === id);
-    await this.update(id, { date: newDate, time: newTime, status: "rescheduled" }, actor);
+    await this.update(id, { date: newDate, time: newTime, status: "rescheduled", rescheduledAt: nowISO() }, actor);
     if (appt) {
       await Promise.all(
         users
@@ -114,7 +142,7 @@ export const appointmentsService = {
     }
     if (partial.paymentStatus === "paid") {
       if (current?.status !== "completed") {
-        throw new Error("Cannot mark as paid: appointment must be completed first.");
+        throw new Error("Cannot mark payment as paid: treatment must be completed first.");
       }
       // Auto-assign sequential OR number if not already set
       if (!current?.receiptNumber && !partial.receiptNumber) {
@@ -130,7 +158,7 @@ export const appointmentsService = {
     // ────────────────────────────────────────────────────────────────
 
     const updatedAt = nowISO();
-    await updateDocTyped<Appointment>("appointments", id, { ...partial, updatedAt } as any);
+    await updateDocTyped<Appointment>("appointments", id, stripUndefined({ ...partial, updatedAt }) as any);
 
     const next = snap.appointments.map((a) =>
       a.id === id ? { ...a, ...partial, updatedAt } as Appointment : a

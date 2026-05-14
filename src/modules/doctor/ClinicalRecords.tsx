@@ -15,7 +15,7 @@ export function ClinicalRecords() {
     () => appointments.filter((a) => a.patientId === selected?.patientId && a.id !== selected?.id).slice(0, 5),
     [appointments, selected],
   );
-  const [form, setForm] = useState({ diagnosis: "", treatmentPlan: "", dentalHistory: "", notes: "", beforeImageUrl: "", afterImageUrl: "" });
+  const [form, setForm] = useState({ diagnosis: "", treatmentPlan: "", dentalHistory: "", notes: "", beforeImageUrl: "", afterImageUrl: "", toothChart: {} as Record<string, string> });
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
@@ -45,6 +45,7 @@ export function ClinicalRecords() {
       notes: selected.notes || "",
       beforeImageUrl: selected.beforeImageUrl || "",
       afterImageUrl: selected.afterImageUrl || "",
+      toothChart: selected.toothChart ?? {},
     });
     setSaved(false);
     setSaveError("");
@@ -55,6 +56,7 @@ export function ClinicalRecords() {
   }
 
   const hasNotes = !!(form.diagnosis || form.treatmentPlan || form.dentalHistory || form.notes);
+  const isReadOnly = selected.status === "completed" && user.role !== "admin" && user.role !== "doctor";
 
   const handleSave = async () => {
     setSaving(true); setSaveError("");
@@ -142,28 +144,31 @@ export function ClinicalRecords() {
                 {selected.patientName} — {selected.serviceName}
               </h3>
             </div>
-            {saved && <Badge tone="paid">✓ Saved</Badge>}
+            <div className="flex items-center gap-2">
+              {isReadOnly && <Badge tone="completed">Completed · Read-only</Badge>}
+              {saved && <Badge tone="paid">✓ Saved</Badge>}
+            </div>
           </div>
 
           <div className="grid md:grid-cols-2 gap-4">
             <div>
               <Label>Diagnosis</Label>
-              <Textarea rows={4} placeholder="Enter diagnosis…" value={form.diagnosis}
+              <Textarea rows={4} placeholder="Enter diagnosis…" value={form.diagnosis} disabled={isReadOnly}
                 onChange={(e) => setForm((p) => ({ ...p, diagnosis: e.target.value }))} />
             </div>
             <div>
               <Label>Treatment Plan</Label>
-              <Textarea rows={4} placeholder="Describe the treatment plan…" value={form.treatmentPlan}
+              <Textarea rows={4} placeholder="Describe the treatment plan…" value={form.treatmentPlan} disabled={isReadOnly}
                 onChange={(e) => setForm((p) => ({ ...p, treatmentPlan: e.target.value }))} />
             </div>
             <div>
               <Label>Dental History</Label>
-              <Textarea rows={4} placeholder="Relevant dental history…" value={form.dentalHistory}
+              <Textarea rows={4} placeholder="Relevant dental history…" value={form.dentalHistory} disabled={isReadOnly}
                 onChange={(e) => setForm((p) => ({ ...p, dentalHistory: e.target.value }))} />
             </div>
             <div>
               <Label>Doctor Notes</Label>
-              <Textarea rows={4} placeholder="Additional observations or instructions…" value={form.notes}
+              <Textarea rows={4} placeholder="Additional observations or instructions…" value={form.notes} disabled={isReadOnly}
                 onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))} />
             </div>
           </div>
@@ -179,9 +184,13 @@ export function ClinicalRecords() {
           )}
 
           <div className="mt-5 pt-4 border-t border-gold-500/15 flex flex-wrap items-center gap-3">
-            <Button disabled={saving} onClick={handleSave}>{saving ? "Saving…" : "Save Clinical Record"}</Button>
-            {saved && hasNext && (
-              <Button variant="outline" size="sm" onClick={() => { goNext(); setSaved(false); }}>Next Patient →</Button>
+            {!isReadOnly && (
+              <>
+                <Button disabled={saving} onClick={handleSave}>{saving ? "Saving…" : "Save Clinical Record"}</Button>
+                {saved && hasNext && (
+                  <Button variant="outline" size="sm" onClick={() => { goNext(); setSaved(false); }}>Next Patient →</Button>
+                )}
+              </>
             )}
             <span className="text-xs text-gold-100/40">All actions are logged in the audit trail.</span>
             {saveError && <p className="text-sm text-red-400">{saveError}</p>}
@@ -202,8 +211,8 @@ export function ClinicalRecords() {
               return (
                 <div key={type}>
                   <Label>{type === "before" ? "Before Treatment" : "After Treatment"}</Label>
-                  <input type="file" accept="image/*"
-                    className="mt-1 w-full text-sm text-gold-100/70 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border file:border-gold-500/30 file:bg-ink-900/60 file:text-gold-200 file:text-xs file:cursor-pointer hover:file:border-gold-400/60 cursor-pointer"
+                  <input type="file" accept="image/*" disabled={isReadOnly}
+                    className="mt-1 w-full text-sm text-gold-100/70 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border file:border-gold-500/30 file:bg-ink-900/60 file:text-gold-200 file:text-xs file:cursor-pointer hover:file:border-gold-400/60 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                     onChange={async (e) => {
                       const file = e.target.files?.[0];
                       if (!file) return;
@@ -223,7 +232,9 @@ export function ClinicalRecords() {
             })}
           </div>
           <div className="mt-5 pt-4 border-t border-gold-500/15 flex gap-3">
-            <Button disabled={saving} onClick={handleSave}>{saving ? "Saving…" : "Save Photos"}</Button>
+            {!isReadOnly && (
+              <Button disabled={saving} onClick={handleSave}>{saving ? "Saving…" : "Save Photos"}</Button>
+            )}
             {saveError && <p className="text-sm text-red-400">{saveError}</p>}
           </div>
         </Card>

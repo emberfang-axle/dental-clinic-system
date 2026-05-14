@@ -6,13 +6,7 @@ function nowISO() { return new Date().toISOString(); }
 
 async function persist(entry: Omit<NotificationEntry, "id">): Promise<NotificationEntry> {
   const id = await addDocTyped("notifications", entry as any);
-  const n = { ...entry, id } as NotificationEntry;
-  // Optimistic local update for the current user
-  const snap = getSnapshot();
-  if (snap.user?.id === entry.userId) {
-    setState({ notifications: [n, ...snap.notifications] });
-  }
-  return n;
+  return { ...entry, id } as NotificationEntry;
 }
 
 export const notificationsService = {
