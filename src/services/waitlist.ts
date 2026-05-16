@@ -1,5 +1,4 @@
-import { collection, doc, db } from "./firestore";
-import { setDoc, deleteDoc } from "firebase/firestore";
+import { setDocTyped, deleteDocTyped } from "./firestore";
 import { getSnapshot, setState, showToast } from "../store/store";
 import type { WaitlistEntry } from "../shared/types";
 
@@ -15,14 +14,13 @@ export const waitlistService = {
 
     const id = makeId();
     const data: WaitlistEntry = { ...entry, id, createdAt: new Date().toISOString() };
-    const ref = doc(collection(db, "waitlist"), id);
-    await setDoc(ref, data);
+    await setDocTyped("waitlist", id, data as any);
     setState({ waitlist: [data, ...waitlist] });
     showToast("Added to waitlist. We'll notify you if a slot opens.", "success");
   },
 
   async leave(id: string) {
-    await deleteDoc(doc(collection(db, "waitlist"), id));
+    await deleteDocTyped("waitlist", id);
     const { waitlist } = getSnapshot();
     setState({ waitlist: waitlist.filter((w) => w.id !== id) });
     showToast("Removed from waitlist.", "info");

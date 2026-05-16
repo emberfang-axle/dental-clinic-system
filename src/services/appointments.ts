@@ -1,16 +1,16 @@
 import type { Appointment } from "../shared/types";
 import { getSnapshot, setState, showToast } from "../store/store";
-import { updateDocTyped, deleteDocTyped, collection, doc, db, runTransaction } from "./firestore";
-import { getDocs, query, where } from "firebase/firestore";
+import { updateDocTyped, deleteDocTyped, setDocTyped } from "./firestore";
 import { calendarService } from "./calendar";
 import { notificationsService } from "./notifications";
+import { emailService } from "./email";
+import { smsService } from "./sms";
 
 function nowISO() { return new Date().toISOString(); }
 function makeId(prefix: string) {
   return `${prefix}_${Math.random().toString(16).slice(2)}_${Date.now().toString(16)}`;
 }
 
-/** Remove undefined values so Firestore never receives them. */
 function stripUndefined<T extends object>(obj: T): T {
   return Object.fromEntries(
     Object.entries(obj).filter(([, v]) => v !== undefined)
@@ -43,7 +43,7 @@ export const appointmentsService = {
   async book(input: NewAppointment) {
     const sanitized: NewAppointment = {
       ...input,
-      patientName: sanitizeStr(input.patientName, 100),
+      patientName:   sanitizeStr(input.patientName, 100),
       notes:         input.notes         ? sanitizeStr(input.notes, 1000)         : undefined,
       diagnosis:     input.diagnosis     ? sanitizeStr(input.diagnosis, 1000)     : undefined,
       treatmentPlan: input.treatmentPlan ? sanitizeStr(input.treatmentPlan, 1000) : undefined,
@@ -55,39 +55,44 @@ export const appointmentsService = {
     }
 
     const now = nowISO();
-    const newRef = doc(collection(db, "appointments"));
-    const data = stripUndefined({ ...sanitized, id: newRef.id, createdAt: now, updatedAt: now });
+    const newId = makeId("appt");
+    const data = stripUndefined({ ...sanitized, id: newId, createdAt: now, updatedAt: now });
 
-    // Transactional slot claim — prevents two simultaneous bookings on the same slot
-    await runTransaction(db, async (tx) => {
-      const existing = await getDocs(
-        query(collection(db, "appointments"),
-          where("date", "==", sanitized.date),
-          where("time", "==", sanitized.time)
-        )
-      );
-      const taken = existing.docs.some((d) => d.data().status !== "cancelled");
-      if (taken) throw new Error("This time slot was just taken. Please pick another.");
-      tx.set(newRef, data);
-    });
+    await setDocTyped("appointments", newId, data as any);
 
     const calendarEventId = await calendarService.createBookingEvent({
       patientName: sanitized.patientName, serviceName: sanitized.serviceName,
       doctor: sanitized.doctor, date: sanitized.date, time: sanitized.time,
     });
     if (calendarEventId) {
-      await updateDocTyped("appointments", newRef.id, { calendarEventId } as any);
+      await updateDocTyped("appointments", newId, { calendarEventId } as any);
     }
 
     const ap: Appointment = { ...data, calendarEventId };
     addLog(sanitized.patientName, "Booked appointment", `${ap.serviceName} (${ap.date} ${ap.time})`, undefined, { status: ap.status, date: ap.date, time: ap.time });
     showToast(`Appointment booked for ${ap.date} at ${ap.time}.`, "success");
 
+    // Notify staff in-app. Email to patient sent via Resend.
     await notificationsService.notifyStaff(
       "New Appointment Booked",
       `${sanitized.patientName} booked ${sanitized.serviceName} on ${sanitized.date} at ${sanitized.time}. Please review and confirm.`,
       "appointment"
     );
+
+    if (sanitized.patientEmail) {
+      void emailService.sendBookingConfirmation({
+        patientEmail: sanitized.patientEmail,
+        patientName: sanitized.patientName,
+        serviceName: sanitized.serviceName,
+        date: sanitized.date,
+        time: sanitized.time,
+        doctor: sanitized.doctor,
+      });
+    }
+    if (sanitized.patientPhone) {
+      void smsService.booked(sanitized.patientPhone, sanitized.patientName, sanitized.serviceName, sanitized.date, sanitized.time);
+    }
+
     return ap;
   },
 
@@ -99,7 +104,6 @@ export const appointmentsService = {
     addLog(actor, "Deleted appointment", id, before ? { status: before.status, date: before.date, time: before.time } : undefined);
   },
 
-  /** Cancel (delete) an appointment and notify all staff/doctors. Used by patient cancel button. */
   async cancelAndNotify(id: string, actor: string) {
     const { appointments, users } = getSnapshot();
     const appt = appointments.find((a) => a.id === id);
@@ -114,7 +118,6 @@ export const appointmentsService = {
     }
   },
 
-  /** Reschedule and notify all staff/doctors. Used by patient reschedule. */
   async rescheduleAndNotify(id: string, newDate: string, newTime: string, actor: string) {
     const { appointments, users } = getSnapshot();
     const appt = appointments.find((a) => a.id === id);
@@ -133,7 +136,6 @@ export const appointmentsService = {
     const snap = getSnapshot();
     const current = snap.appointments.find((a) => a.id === id);
 
-    // ── Business rules ──────────────────────────────────────────────
     if (partial.status === "completed") {
       const merged = { ...current, ...partial };
       if (!merged.diagnosis && !merged.notes && !merged.treatmentPlan) {
@@ -144,7 +146,6 @@ export const appointmentsService = {
       if (current?.status !== "completed") {
         throw new Error("Cannot mark payment as paid: treatment must be completed first.");
       }
-      // Auto-assign sequential OR number if not already set
       if (!current?.receiptNumber && !partial.receiptNumber) {
         const year = new Date().getFullYear();
         const paid = snap.appointments.filter((a) => a.receiptNumber?.startsWith(`OR-${year}-`));
@@ -155,7 +156,6 @@ export const appointmentsService = {
         partial = { ...partial, receiptNumber: `OR-${year}-${String(maxSeq + 1).padStart(4, "0")}` };
       }
     }
-    // ────────────────────────────────────────────────────────────────
 
     const updatedAt = nowISO();
     await updateDocTyped<Appointment>("appointments", id, stripUndefined({ ...partial, updatedAt }) as any);
@@ -165,31 +165,54 @@ export const appointmentsService = {
     );
     setState({ appointments: next });
 
-    // Capture before/after for audit
     const before = current ? { status: current.status, paymentStatus: current.paymentStatus, date: current.date, time: current.time } : undefined;
-    const after  = { ...before, ...partial };
-    addLog(actor, "Updated appointment", id, before, after);
+    addLog(actor, "Updated appointment", id, before, { ...before, ...partial });
+
+    // Notifications and emails are fire-and-forget — must not block or throw on the main update.
+    const notify = (fn: () => Promise<unknown>) => { fn().catch(() => {}); };
 
     if (partial.status === "confirmed") {
       showToast("Appointment confirmed.", "success");
       if (current) {
-        await notificationsService.notify(current.patientId, "Appointment Confirmed ✓",
-          `Your ${current.serviceName} appointment on ${current.date} at ${current.time} has been confirmed. Please arrive 10 minutes early.`, "appointment");
-        await notificationsService.notifyStaff("Appointment Confirmed",
-          `${current.patientName}'s ${current.serviceName} on ${current.date} at ${current.time} was confirmed by ${actor}.`, "appointment");
+        notify(() => notificationsService.notify(current.patientId, "Appointment Confirmed ✓",
+          `Your ${current.serviceName} appointment on ${current.date} at ${current.time} has been confirmed. Please arrive 10 minutes early.`, "appointment"));
+        notify(() => notificationsService.notifyStaff("Appointment Confirmed",
+          `${current.patientName}'s ${current.serviceName} on ${current.date} at ${current.time} was confirmed by ${actor}.`, "appointment"));
+        if (current.patientEmail) void emailService.sendConfirmation({ patientEmail: current.patientEmail, patientName: current.patientName, serviceName: current.serviceName, date: current.date, time: current.time });
+        if (current.patientPhone) void smsService.confirmed(current.patientPhone, current.patientName, current.serviceName, current.date, current.time);
       }
     }
     if (partial.status === "in-progress" && current) {
-      await notificationsService.notify(current.patientId, "Your Appointment Has Started",
-        `Your ${current.serviceName} appointment is now in progress. The doctor is ready for you.`, "appointment");
+      notify(() => notificationsService.notify(current.patientId, "Your Appointment Has Started",
+        `Your ${current.serviceName} appointment is now in progress. The doctor is ready for you.`, "appointment"));
     }
     if (partial.status === "completed" && current) {
-      await notificationsService.notify(current.patientId, "Appointment Completed",
-        `Your ${current.serviceName} appointment has been completed. Thank you for visiting Estandarte Dental Clinic!`, "appointment");
+      notify(() => notificationsService.notify(current.patientId, "Appointment Completed",
+        `Your ${current.serviceName} appointment has been completed. Thank you for visiting Estandarte Dental Clinic!`, "appointment"));
+      if (current.patientEmail) void emailService.sendCompletion({ patientEmail: current.patientEmail, patientName: current.patientName, serviceName: current.serviceName });
+      if (current.patientPhone) void smsService.completed(current.patientPhone, current.patientName, current.serviceName);
     }
     if (partial.status === "no-show" && current) {
-      await notificationsService.notifyStaff("Patient No-Show",
-        `${current.patientName} did not show up for ${current.serviceName} on ${current.date} at ${current.time}.`, "appointment");
+      notify(() => notificationsService.notifyStaff("Patient No-Show",
+        `${current.patientName} did not show up for ${current.serviceName} on ${current.date} at ${current.time}.`, "appointment"));
+    }
+    if (partial.status === "cancelled" && current?.patientEmail) {
+      void emailService.sendCancellation({ patientEmail: current.patientEmail, patientName: current.patientName, serviceName: current.serviceName, date: current.date, time: current.time });
+    }
+    if (partial.status === "cancelled" && current?.patientPhone) {
+      void smsService.cancelled(current.patientPhone, current.patientName, current.serviceName, current.date, current.time);
+    }
+    if (partial.status === "rescheduled" && current?.patientEmail) {
+      void emailService.sendReschedule({ patientEmail: current.patientEmail, patientName: current.patientName, serviceName: current.serviceName, date: partial.date ?? current.date, time: partial.time ?? current.time });
+    }
+    if (partial.status === "rescheduled" && current?.patientPhone) {
+      void smsService.rescheduled(current.patientPhone, current.patientName, current.serviceName, partial.date ?? current.date, partial.time ?? current.time);
+    }
+    if (partial.paymentStatus === "paid" && current?.patientEmail) {
+      void emailService.sendPaymentConfirmation({ patientEmail: current.patientEmail, patientName: current.patientName, serviceName: current.serviceName, price: current.price, receiptNumber: partial.receiptNumber ?? current.receiptNumber });
+    }
+    if (partial.paymentStatus === "paid" && current?.patientPhone) {
+      void smsService.paid(current.patientPhone, current.patientName, current.serviceName, current.price, partial.receiptNumber ?? current.receiptNumber);
     }
   },
 };

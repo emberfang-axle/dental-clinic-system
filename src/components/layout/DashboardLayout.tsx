@@ -31,7 +31,7 @@ export function DashboardLayout({ user, tabs, activeTab, onTabChange, navigate, 
   const currentLabel = tabs.find((t) => t.id === activeTab)?.label || "Dashboard";
 
   return (
-    <div className="min-h-screen bg-ink-950 flex relative overflow-hidden">
+    <div className="min-h-screen bg-ink-950 flex relative">
       <div className="absolute top-0 right-0 w-[520px] h-[520px] bg-gold-600/8 rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute bottom-0 left-0 w-[420px] h-[420px] bg-gold-500/6 rounded-full blur-[120px] pointer-events-none" />
 

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Button, Input, Label, Textarea } from "../../components/ui";
 import { announcementsService } from "../../services/announcements";
 import { useStore } from "../../store/store";
@@ -10,7 +10,7 @@ export function AnnouncementsPage() {
   const [pinned, setPinned] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const submitting = { current: false };
+  const submitting = useRef(false);
 
   async function post() {
     if (!title.trim() || !body.trim() || submitting.current) return;

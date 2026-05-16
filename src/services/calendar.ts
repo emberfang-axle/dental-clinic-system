@@ -1,4 +1,7 @@
 import type { Appointment } from "../shared/types";
+import { BOOKING } from "../shared/constants";
+
+const BOOKING_SLOTS = BOOKING.TIME_SLOTS as readonly string[];
 
 /**
  * Demo-safe Google Calendar integration facade.
@@ -49,8 +52,8 @@ export const calendarService = {
   },
 
   isDateBlocked(date: string) {
-    const allSlots = ["09:00","10:00","11:00","1:00","2:00","3:00","4:00"];
-    return allSlots.every((t) => readBlockedSlots().some((s) => s.date === date && s.time === t));
+    const slots = readBlockedSlots();
+    return BOOKING_SLOTS.every((t) => slots.some((s) => s.date === date && s.time === t));
   },
 
   unblockSlot(date: string, time: string) {

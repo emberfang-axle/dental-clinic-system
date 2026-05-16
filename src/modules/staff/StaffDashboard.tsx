@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button, Badge } from "../../components/ui";
-import { StatGrid, TodaySchedule, AlertBanner, OverviewHeader } from "../../components/ui/DashboardWidgets";
+import { StatGrid, TodaySchedule, AlertBanner } from "../../components/ui/DashboardWidgets";
 import { DashboardLayout } from "../../components/layout/DashboardLayout";
 import { useStore } from "../../store/store";
 import { DASHBOARD_TABS } from "../../shared/constants";
@@ -50,7 +50,7 @@ export function StaffDashboard({ navigate }: { navigate: (p: string) => void }) 
   );
 }
 
-function StaffOverview({ onTabChange, onNewBooking }: { onTabChange: (t: string) => void; onNewBooking: () => void }) {
+function StaffOverview({ onTabChange, onNewBooking: _onNewBooking }: { onTabChange: (t: string) => void; onNewBooking: () => void }) {
   const { user, appointments } = useStore();
   if (!user) return null;
 
@@ -71,11 +71,6 @@ function StaffOverview({ onTabChange, onNewBooking }: { onTabChange: (t: string)
 
   return (
     <div className="space-y-6">
-      <OverviewHeader role="Staff Panel" name={user.name}
-        sub={new Date().toLocaleDateString("en-PH", { weekday: "long", month: "long", day: "numeric" })}>
-        <Button onClick={onNewBooking}>+ New Appointment</Button>
-      </OverviewHeader>
-
       <div className="space-y-2">
         {pending.length > 0 && (
           <AlertBanner message={`⚠ ${pending.length} appointment${pending.length > 1 ? "s" : ""} awaiting confirmation`}

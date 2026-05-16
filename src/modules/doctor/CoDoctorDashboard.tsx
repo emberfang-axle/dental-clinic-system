@@ -6,7 +6,7 @@ import { AppointmentsList } from "../appointment/AppointmentsList";
 import { NotificationsCenter, ProfilePage } from "../shared/SharedModules";
 import { ClinicalRecords } from "./ClinicalRecords";
 import { AnnouncementsPage } from "./AnnouncementsPage";
-import { StatGrid, TodaySchedule, AlertBanner, OverviewHeader, WeeklyMiniCalendar } from "../../components/ui/DashboardWidgets";
+import { StatGrid, TodaySchedule, AlertBanner, WeeklyMiniCalendar } from "../../components/ui/DashboardWidgets";
 
 export function CoDoctorDashboard({ navigate }: { navigate: (p: string) => void }) {
   const { user } = useStore();
@@ -44,9 +44,6 @@ function CoDoctorOverview({ onTabChange }: { onTabChange: (t: string) => void })
 
   return (
     <div className="space-y-6">
-      <OverviewHeader role="Co-Doctor Panel" name={user.name}
-        sub={new Date().toLocaleDateString("en-PH", { weekday: "long", month: "long", day: "numeric" })} />
-
       {inProgress.length > 0 && (
         <AlertBanner tone="blue"
           message={`${inProgress.length} patient${inProgress.length > 1 ? "s" : ""} currently in progress`}

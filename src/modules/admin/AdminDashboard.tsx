@@ -1,9 +1,11 @@
 import { useState, useMemo, type ReactNode } from "react";
 import { Button, Input, Badge, Card, EmptyState } from "../../components/ui";
-import { AlertBanner, OverviewHeader, WeeklyMiniCalendar } from "../../components/ui/DashboardWidgets";
+import { AlertBanner, WeeklyMiniCalendar } from "../../components/ui/DashboardWidgets";
 import { useStore } from "../../store/store";
 import { ROUTES, DASHBOARD_TABS } from "../../shared/constants";
 import { appointmentsService } from "../../services/appointments";
+import { settingsService } from "../../services/settings";
+import { uploadFile } from "../../services/upload";
 import { DashboardLayout } from "../../components/layout/DashboardLayout";
 import { AppointmentsList } from "../appointment/AppointmentsList";
 import { ClinicalRecords } from "../doctor/ClinicalRecords";
@@ -51,7 +53,7 @@ export function AdminDashboard({ navigate }: { navigate: (p: string) => void }) 
 }
 
 function AdminOverview({ onTabChange }: { onTabChange: (t: string) => void }) {
-  const { user, users, appointments } = useStore();
+  const { users, appointments } = useStore();
   const today     = new Date().toISOString().slice(0, 10);
   const thisMonth = today.slice(0, 7);
 
@@ -94,20 +96,6 @@ function AdminOverview({ onTabChange }: { onTabChange: (t: string) => void }) {
 
   return (
     <div className="space-y-6">
-
-      <OverviewHeader role="Admin Panel" name={user?.name ?? "Doctor"}
-        sub={`${new Date().toLocaleDateString("en-PH", { weekday: "long", month: "long", day: "numeric" })} · ${todayAppts.length} appointment${todayAppts.length !== 1 ? "s" : ""} today`}>
-        <div className="flex gap-2 flex-wrap">
-          <button onClick={() => onTabChange("appointments")}
-            className="px-4 py-2 rounded-lg text-sm border border-gold-500/30 text-gold-200 hover:border-gold-400/60 hover:bg-gold-500/10 transition">
-            Appointments
-          </button>
-          <button onClick={() => onTabChange("staff")}
-            className="px-4 py-2 rounded-lg text-sm border border-gold-500/30 text-gold-200 hover:border-gold-400/60 hover:bg-gold-500/10 transition">
-            + Add Account
-          </button>
-        </div>
-      </OverviewHeader>
 
       <div className="flex flex-col gap-2">
         {pending.length > 0 && (
@@ -362,9 +350,11 @@ function RecentPatients() {
 }
 
 function SystemIntegrationStatus() {
-  const { appointments } = useStore();
+  const { appointments, settings } = useStore();
   const withCalendar = appointments.filter((a) => a.calendarEventId).length;
   const total = appointments.filter((a) => a.status !== "cancelled").length;
+  const [qrUploading, setQrUploading] = useState(false);
+  const [gcashNum, setGcashNum] = useState(settings?.gcashNumber ?? "");
 
   const integrations: { name: string; description: string; triggers: string[]; icon: ReactNode; stat?: string }[] = [
     {
@@ -403,6 +393,58 @@ function SystemIntegrationStatus() {
 
   return (
     <div className="space-y-8 max-w-2xl">
+
+      {/* GCash Settings */}
+      <div>
+        <h2 className="font-serif text-2xl text-gold-shine mb-1">GCash Payment Settings</h2>
+        <p className="text-sm text-gold-100/60 mb-4">Upload the clinic's GCash QR code and number so patients can scan and pay directly.</p>
+        <div className="glass-strong rounded-xl p-5 space-y-4">
+          <div className="flex flex-col sm:flex-row gap-6 items-start">
+            {/* QR preview */}
+            <div className="shrink-0">
+              {settings?.gcashQrUrl ? (
+                <img src={settings.gcashQrUrl} alt="GCash QR" className="w-36 h-36 object-contain rounded-xl border border-gold-500/20" />
+              ) : (
+                <div className="w-36 h-36 rounded-xl border border-dashed border-gold-500/30 bg-ink-900/50 flex items-center justify-center text-gold-100/30 text-xs text-center px-3">
+                  No QR uploaded yet
+                </div>
+              )}
+              <label className="mt-2 block">
+                <span className="text-xs text-gold-300 hover:text-gold-100 cursor-pointer underline transition">
+                  {qrUploading ? "Uploading…" : "Upload QR Image"}
+                </span>
+                <input type="file" accept="image/*" className="hidden" disabled={qrUploading}
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    setQrUploading(true);
+                    try {
+                      const url = await uploadFile(file, `clinic/gcash-qr.${file.name.split(".").pop()}`);
+                      await settingsService.updateClinic({ gcashQrUrl: url }, "admin");
+                    } finally {
+                      setQrUploading(false);
+                    }
+                  }}
+                />
+              </label>
+            </div>
+            {/* GCash number */}
+            <div className="flex-1 space-y-3">
+              <div>
+                <label className="text-xs uppercase tracking-wider text-gold-300/60 block mb-1">GCash Number</label>
+                <div className="flex gap-2">
+                  <Input value={gcashNum} onChange={(e) => setGcashNum(e.target.value)} placeholder="e.g. 09XXXXXXXXX" className="flex-1" />
+                  <Button size="sm" onClick={() => settingsService.updateClinic({ gcashNumber: gcashNum }, "admin")}>Save</Button>
+                </div>
+              </div>
+              <p className="text-xs text-gold-100/40 leading-relaxed">
+                Patients will see this QR code and number when submitting GCash payment proof. They scan, pay, then submit their reference number and screenshot for staff verification.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div>
         <h2 className="font-serif text-2xl text-gold-shine mb-1">System Integrations</h2>
         <p className="text-sm text-gold-100/60 mb-5">All backend functions are deployed on Firebase Cloud Functions and trigger automatically.</p>

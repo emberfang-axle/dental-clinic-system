@@ -1,5 +1,6 @@
 ﻿/**
- * Multi-step appointment booking flow (4 steps).
+ * Multi-step appointment booking flow (4 steps):
+ * 1. Select Service  2. Choose Doctor  3. Schedule  4. Confirm
  * Available to authenticated patients.
  */
 
@@ -27,10 +28,10 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
     (s, i, arr) => arr.findIndex((x) => x.name.toLowerCase() === s.name.toLowerCase()) === i
   );
 
-  // Active doctors from Firestore users only — no hardcoded names
+  // Active doctors from Firestore users only
   const doctorOptions = users
     .filter((u) => (u.role === "doctor" || u.role === "co-doctor") && u.active !== false)
-    .map((d) => ({ name: d.name, sub: d.role === "co-doctor" ? "Co-Doctor" : "Licensed Dentist" }))
+    .map((d) => ({ name: d.name, sub: "Licensed Dentist" }))
     .filter((d, i, arr) => arr.findIndex((x) => x.name === d.name) === i);
 
   const [step, setStep] = useState(1);
@@ -86,6 +87,7 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
 
   function next() {
     setBookingError("");
+    if (step === 2 && !doctor) { setBookingError("Please select a doctor."); return; }
     if (step === 3) {
       if (!time) { setBookingError("Please select a time slot."); return; }
       const today = new Date().toISOString().slice(0, 10);
@@ -179,7 +181,7 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
   }
 
   return (
-    <div className="min-h-screen bg-ink-950 relative overflow-hidden">
+    <div className="min-h-screen bg-ink-950 relative">
       <div className="absolute inset-0 pattern-gold opacity-25" />
       <div className="absolute -top-40 -right-40 w-[500px] h-[500px] bg-gold-600/10 rounded-full blur-[120px]" />
       <div className="absolute -bottom-40 -left-40 w-[400px] h-[400px] bg-gold-500/8 rounded-full blur-[100px]" />
@@ -198,7 +200,7 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
         </div>
 
         {/* Stepper */}
-        <div className="mb-10 flex items-center justify-between max-w-xl mx-auto">
+        <div className="mb-10 flex items-center justify-between max-w-2xl mx-auto overflow-hidden">
           {["Service", "Doctor", "Schedule", "Confirm"].map((label, i) => {
             const active = step >= i + 1;
             const current = step === i + 1;
@@ -223,7 +225,7 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
             <div>
               <div className="text-center mb-6">
                 <h3 className="font-serif text-2xl text-gold-shine mb-1">Select a Service</h3>
-                <p className="text-sm text-gold-100/50">Choose the treatment you'd like to book.</p>
+                <p className="text-sm text-gold-100/50">Choose the treatment you need.</p>
               </div>
               {(() => {
                 const categorised = SERVICE_CATEGORIES.map((cat) => ({
@@ -240,7 +242,9 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
                         <p className="text-[10px] uppercase tracking-[0.3em] text-gold-400/70 font-semibold mb-2">{cat.label}</p>
                         <div className="grid sm:grid-cols-2 gap-3">
                           {cat.items.map((s) => (
-                            <button key={s.id} onClick={() => setServiceId(s.id)} className={`text-left p-4 rounded-xl border transition ${serviceId === s.id ? "border-gold-400 bg-gold-500/10" : "border-gold-500/20 hover:border-gold-400/50"}`}>
+                            <button key={s.id}
+                              onClick={() => { if (serviceId === s.id) { setStep(2); } else { setServiceId(s.id); } }}
+                              className={`text-left p-4 rounded-xl border transition ${serviceId === s.id ? "border-gold-400 bg-gold-500/10" : "border-gold-500/20 hover:border-gold-400/50"}`}>
                               <div className="flex items-center justify-between gap-2">
                                 <span className="font-medium text-gold-100">{s.name}</span>
                                 <span className="text-gold-300 font-mono text-sm whitespace-nowrap">
@@ -252,6 +256,9 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
                                 <div className="mt-2 text-[10px] uppercase tracking-wider font-semibold text-amber-300 bg-amber-500/10 border border-amber-500/25 rounded px-1.5 py-0.5 inline-block">
                                   Deposit: ₱{Math.ceil(s.price * 0.3).toLocaleString()} required
                                 </div>
+                              )}
+                              {serviceId === s.id && (
+                                <div className="mt-2 text-[10px] text-gold-400 font-semibold">✓ Selected — tap again to continue →</div>
                               )}
                             </button>
                           ))}
@@ -273,27 +280,21 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
           {step === 2 && (
             <div>
               <div className="text-center mb-6">
-                <h3 className="font-serif text-2xl text-gold-shine mb-1">Select a Doctor</h3>
-                <p className="text-sm text-gold-100/50">Choose your preferred dentist for this appointment.</p>
+                <h3 className="font-serif text-2xl text-gold-shine mb-1">Choose Your Dentist</h3>
+                <p className="text-sm text-gold-100/50">Select your preferred dentist for this appointment.</p>
               </div>
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {doctorOptions.map((d) => {
                   const initials = d.name.split(" ").filter(Boolean).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
                   const selected = doctor === d.name;
                   return (
-                    <button
-                      key={d.name}
-                      onClick={() => setDoctor(d.name)}
-                      className={`w-full text-left p-5 rounded-xl border transition flex items-center gap-4 ${
-                        selected ? "border-gold-400 bg-gold-500/10" : "border-gold-500/20 hover:border-gold-400/50"
-                      }`}
-                    >
-                      <div className="w-14 h-14 rounded-full bg-gold-gradient flex items-center justify-center text-ink-950 font-serif font-bold text-xl shrink-0">
-                        {initials}
-                      </div>
+                    <button key={d.name} onClick={() => { if (doctor === d.name) { setStep(3); } else { setDoctor(d.name); } }} onDoubleClick={() => { setDoctor(d.name); setStep(3); }}
+                      className={`w-full text-left p-4 rounded-xl border transition flex items-center gap-4 ${selected ? "border-gold-400 bg-gold-500/10" : "border-gold-500/20 hover:border-gold-400/50"}`}>
+                      <div className="w-11 h-11 rounded-full bg-gold-gradient flex items-center justify-center text-ink-950 font-serif font-bold text-base shrink-0">{initials}</div>
                       <div className="min-w-0">
-                        <div className="font-semibold text-gold-100">{d.name}</div>
-                        <div className="text-sm text-gold-100/60">{d.sub}</div>
+                        <div className="font-semibold text-gold-100 text-sm">{d.name}</div>
+                        <div className="text-xs text-gold-100/60">{d.sub}</div>
+                        {selected && <div className="text-[10px] text-gold-400 font-semibold mt-0.5">✓ Selected — tap again to continue →</div>}
                       </div>
                       {selected && <span className="ml-auto text-gold-400 text-lg shrink-0">✓</span>}
                     </button>
@@ -363,23 +364,20 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
                           >
                             {t}
                           </button>
-                          {/* Tooltip */}
+                          {/* Tooltip — hidden on touch, shown on hover for desktop */}
                           {taken && (
-                            <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-20 opacity-0 group-hover/slot:opacity-100 transition-opacity duration-150">
+                            <div className="pointer-events-none absolute bottom-full left-0 mb-2 z-20 opacity-0 group-hover/slot:opacity-100 transition-opacity duration-150 hidden sm:block">
                               <div className="bg-ink-800 border border-red-500/40 text-red-300 text-[10px] font-semibold px-2.5 py-1.5 rounded-lg whitespace-nowrap shadow-lg">
                                 Slot Unavailable
                                 <div className="text-red-400/60 font-normal">{slotCount} booking{slotCount !== 1 ? "s" : ""} on this time</div>
                               </div>
-                              <div className="w-2 h-2 bg-ink-800 border-r border-b border-red-500/40 rotate-45 mx-auto -mt-1" />
                             </div>
                           )}
-                          {/* Available tooltip on hover */}
                           {!taken && !selected && (
-                            <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-20 opacity-0 group-hover/slot:opacity-100 transition-opacity duration-150">
+                            <div className="pointer-events-none absolute bottom-full left-0 mb-2 z-20 opacity-0 group-hover/slot:opacity-100 transition-opacity duration-150 hidden sm:block">
                               <div className="bg-ink-800 border border-gold-500/30 text-gold-300 text-[10px] font-semibold px-2.5 py-1.5 rounded-lg whitespace-nowrap shadow-lg">
                                 Slot Available
                               </div>
-                              <div className="w-2 h-2 bg-ink-800 border-r border-b border-gold-500/30 rotate-45 mx-auto -mt-1" />
                             </div>
                           )}
                         </div>

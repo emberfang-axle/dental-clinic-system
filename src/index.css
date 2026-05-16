@@ -40,6 +40,11 @@ html, body, #root {
   font-weight: 400;
 }
 
+/* Photo overlay — always dark regardless of theme so text on images stays readable */
+.photo-overlay {
+  background: linear-gradient(to top, rgba(0,0,0,0.82) 0%, rgba(0,0,0,0.2) 50%, transparent 100%);
+}
+
 body {
   line-height: 1.65;
   text-rendering: optimizeLegibility;

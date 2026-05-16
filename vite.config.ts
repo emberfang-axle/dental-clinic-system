@@ -19,4 +19,13 @@ export default defineConfig({
     host: "localhost",
     port: 5174,
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          firebase: ["firebase/app", "firebase/auth", "firebase/firestore", "firebase/storage"],
+        },
+      },
+    },
+  },
 });

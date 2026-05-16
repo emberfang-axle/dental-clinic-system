@@ -20,7 +20,7 @@ export function StaffQueue() {
   const [dedupMsg, setDedupMsg] = useState<string | null>(null);
 
   const queue = appointments
-    .filter((a) => a.status !== "cancelled" && (a.date >= today || a.status === "confirmed" || a.status === "completed"))
+    .filter((a) => a.status !== "cancelled")
     .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
 
   const todayQueue = queue.filter((a) => a.date === today);
@@ -57,10 +57,9 @@ export function StaffQueue() {
       {/* Header */}
       <div className="glass-strong rounded-2xl p-6 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <p className="text-[10px] uppercase tracking-[0.26em] text-gold-300/55">Staff Panel</p>
-          <h2 className="font-serif text-2xl text-gold-shine mt-0.5">Daily Queue</h2>
+          <h2 className="font-serif text-2xl text-gold-shine">Daily Queue</h2>
           <p className="text-xs text-gold-100/45 mt-1">
-            {todayQueue.length} appointment{todayQueue.length !== 1 ? "s" : ""} today · {queue.length} total upcoming
+            {todayQueue.length} appointment{todayQueue.length !== 1 ? "s" : ""} today · {queue.length} total
           </p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
@@ -159,6 +158,8 @@ function PaymentActions({ a, onUpdate, actor }: {
   onUpdate: (id: string, data: Partial<Appointment>) => Promise<void>;
   actor: string;
 }) {
+  const [imgOpen, setImgOpen] = useState(false);
+
   if (a.paymentStatus === "paid") {
     return <p className="text-xs text-emerald-400">✓ Paid via {a.paymentMethod === "gcash" ? "GCash" : "Cash"}</p>;
   }
@@ -166,6 +167,47 @@ function PaymentActions({ a, onUpdate, actor }: {
   // Payment can only be collected after treatment is done
   if (a.status !== "completed") {
     return <p className="text-xs text-gold-100/35 italic">Payment available after treatment is completed.</p>;
+  }
+
+  // GCash receipt uploaded by patient — staff reviews and confirms
+  if (a.paymentStatus === "pending_verification") {
+    return (
+      <div className="space-y-2">
+        <p className="text-xs text-blue-300 font-medium">⏳ GCash receipt submitted — review and confirm</p>
+        {a.paymentScreenshotUrl && (
+          <div>
+            <button
+              type="button"
+              onClick={() => setImgOpen(true)}
+              className="text-xs text-gold-400 underline hover:text-gold-200 transition"
+            >
+              View receipt
+            </button>
+            {imgOpen && (
+              <div
+                className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
+                onClick={() => setImgOpen(false)}
+              >
+                <img
+                  src={a.paymentScreenshotUrl}
+                  alt="GCash receipt"
+                  className="max-w-[90vw] max-h-[85vh] rounded-xl border border-gold-500/30 shadow-2xl"
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </div>
+            )}
+          </div>
+        )}
+        <div className="flex gap-2 flex-wrap">
+          <Button size="sm" onClick={() => onUpdate(a.id, { paymentMethod: "gcash", paymentStatus: "paid" })}>
+            ✓ Mark Paid (GCash)
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => onUpdate(a.id, { paymentStatus: "unpaid" })}>
+            Reject
+          </Button>
+        </div>
+      </div>
+    );
   }
 
   if (a.paymentStatus === "partial_paid") {

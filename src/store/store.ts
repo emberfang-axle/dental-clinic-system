@@ -21,6 +21,7 @@ export interface ToastEntry {
 
 export interface AppState {
   authReady: boolean;
+  profileReady: boolean;
   user: User | null;
   users: User[];
   services: Service[];
@@ -38,6 +39,7 @@ export interface AppState {
 
 let state: AppState = {
   authReady: false,
+  profileReady: false,
   user: null,
   users: [],
   services: [],
@@ -73,6 +75,7 @@ export function setState(partial: Partial<AppState>) {
 export function resetState() {
   state = {
     authReady: false,
+    profileReady: false,
     user: null,
     users: [],
     services: [],

@@ -3,6 +3,8 @@ import { useStore } from "./store/store";
 import { canAccessRoute, dashboardPathFor } from "./shared/helpers";
 import { ROUTES } from "./shared/constants";
 import { LandingPage } from "./modules/landing/LandingPage";
+import { PrivacyPage } from "./modules/landing/PrivacyPage";
+import { TermsPage } from "./modules/landing/TermsPage";
 import { LoginPage, RegisterPage } from "./modules/auth/AuthPage";
 import { AdminLoginPage } from "./modules/auth/AdminLoginPage";
 import { BookAppointmentPage } from "./modules/appointment/BookAppointmentPage";
@@ -26,6 +28,8 @@ const PAGES: PageMap = {
   [ROUTES.register]:         (p) => <RegisterPage {...p} />,
   [ROUTES.book]:             (p) => <BookAppointmentPage {...p} />,
   "/setup":                  (p) => <SetupPage {...p} />,
+  "/privacy":                (p) => <PrivacyPage {...p} />,
+  "/terms":                  (p) => <TermsPage {...p} />,
   [ROUTES.adminDashboard]:    (p) => <AdminDashboard {...p} />,
   [ROUTES.doctorDashboard]:   (p) => <DoctorDashboard {...p} />,
   [ROUTES.coDoctorDashboard]: (p) => <CoDoctorDashboard {...p} />,
@@ -35,7 +39,7 @@ const PAGES: PageMap = {
 
 export default function App() {
   const [path, setPath] = useState(() => window.location.hash.replace(/^#/, "") || ROUTES.home);
-  const { user, authReady } = useStore();
+  const { user, authReady, profileReady } = useStore();
 
   useEffect(() => {
     const onHash = () => setPath(window.location.hash.replace(/^#/, "") || ROUTES.home);
@@ -53,7 +57,7 @@ export default function App() {
   const isDashboard = path.startsWith(ROUTES.dashboard);
 
   let redirect: string | null = null;
-  if (authReady) {
+  if (authReady && profileReady) {
     if (path === ROUTES.dashboard)                        redirect = user ? dashboardPathFor(role!) : ROUTES.login;
     else if (isDashboard && !user)                        redirect = ROUTES.login;
     else if (isDashboard && !canAccessRoute(path, role))  redirect = dashboardPathFor(role!);
@@ -63,7 +67,7 @@ export default function App() {
     if (redirect) navigate(redirect);
   }, [redirect]);
 
-  if (!authReady || redirect) return (
+  if (!authReady || !profileReady || redirect) return (
     <div className="min-h-screen bg-ink-950 flex items-center justify-center">
       <div className="w-10 h-10 rounded-full border-2 border-gold-400 border-t-transparent animate-spin" />
     </div>

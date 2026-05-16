@@ -139,18 +139,54 @@ export function WeeklyMiniCalendar({ appointments, onTabChange }: {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <p className="font-serif text-xl text-gold-shine">Weekly Overview</p>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 flex-wrap">
           <button onClick={() => setWeekOffset((o) => o - 1)} className="h-7 w-7 rounded-lg border border-gold-500/25 text-gold-300 hover:bg-gold-500/10 transition text-sm flex items-center justify-center">‹</button>
-          <span className="text-xs text-gold-100/50 min-w-[160px] text-center">{weekLabel}</span>
+          <span className="text-xs text-gold-100/50 text-center">{weekLabel}</span>
           <button onClick={() => setWeekOffset((o) => o + 1)} className="h-7 w-7 rounded-lg border border-gold-500/25 text-gold-300 hover:bg-gold-500/10 transition text-sm flex items-center justify-center">›</button>
           {weekOffset !== 0 && (
-            <button onClick={() => setWeekOffset(0)} className="text-[10px] uppercase tracking-wider text-gold-400/60 hover:text-gold-300 transition ml-1">Today</button>
+            <button onClick={() => setWeekOffset(0)} className="text-[10px] uppercase tracking-wider text-gold-400/60 hover:text-gold-300 transition">Today</button>
           )}
         </div>
       </div>
-      <div className="grid grid-cols-7 gap-1.5">
+
+      {/* Mobile: 3+3 grid (Mon–Wed / Thu–Sat), Sun hidden */}
+      <div className="grid grid-cols-3 gap-1.5 sm:hidden">
+        {days.filter((d) => d.getDay() !== 0).map((d) => {
+          const dateStr = d.toISOString().slice(0, 10);
+          const isToday = dateStr === todayStr;
+          const dayAppts = appointments.filter((a) => a.date === dateStr && a.status !== "cancelled");
+          const hasPending = dayAppts.some((a) => a.status === "pending");
+          const hasEmergency = dayAppts.some((a) => a.emergency);
+          return (
+            <button key={dateStr} onClick={() => onTabChange("appointments")}
+              className={`rounded-xl p-2 text-center transition-all ${
+                isToday ? "border border-gold-400/60 bg-gold-500/12 shadow-luxe"
+                : "border border-gold-500/15 hover:border-gold-400/40 hover:bg-gold-500/5"
+              }`}>
+              <div className={`text-[10px] uppercase tracking-wider mb-1 ${isToday ? "text-gold-300" : "text-gold-100/40"}`}>
+                {d.toLocaleDateString("en-PH", { weekday: "short" })}
+              </div>
+              <div className={`font-serif text-base leading-none ${isToday ? "text-gold-shine" : "text-gold-100/70"}`}>
+                {d.getDate()}
+              </div>
+              {dayAppts.length > 0 ? (
+                <div className="mt-1 flex justify-center gap-1">
+                  {hasEmergency && <span className="w-1.5 h-1.5 rounded-full bg-red-400" />}
+                  {hasPending   && <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />}
+                  {!hasEmergency && !hasPending && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />}
+                </div>
+              ) : (
+                <div className="text-[9px] text-gold-100/20 mt-1">—</div>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Desktop: full 7-column layout */}
+      <div className="hidden sm:grid grid-cols-7 gap-1.5">
         {days.map((d) => {
           const dateStr = d.toISOString().slice(0, 10);
           const isToday = dateStr === todayStr;
@@ -158,7 +194,6 @@ export function WeeklyMiniCalendar({ appointments, onTabChange }: {
           const dayAppts = appointments.filter((a) => a.date === dateStr && a.status !== "cancelled");
           const hasPending = dayAppts.some((a) => a.status === "pending");
           const hasEmergency = dayAppts.some((a) => a.emergency);
-
           return (
             <button key={dateStr} onClick={() => !isSunday && onTabChange("appointments")} disabled={isSunday}
               className={`relative rounded-xl p-2 text-center transition-all ${
@@ -192,6 +227,7 @@ export function WeeklyMiniCalendar({ appointments, onTabChange }: {
           );
         })}
       </div>
+
       <div className="flex items-center gap-4 mt-2 px-1">
         <span className="flex items-center gap-1.5 text-[10px] text-gold-100/40"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />Confirmed</span>
         <span className="flex items-center gap-1.5 text-[10px] text-gold-100/40"><span className="w-1.5 h-1.5 rounded-full bg-amber-400" />Pending</span>

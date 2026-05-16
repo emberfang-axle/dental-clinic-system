@@ -5,14 +5,11 @@
   updateProfile as updateFirebaseProfile,
   verifyBeforeUpdateEmail,
   sendPasswordResetEmail,
-  sendEmailVerification,
-  signInWithRedirect,
-  getRedirectResult,
   getAuth,
 } from "firebase/auth";
 import { initializeApp, deleteApp } from "firebase/app";
 import type { Role, User } from "../shared/types";
-import { auth, app, googleProvider } from "./firebase";
+import { auth, app } from "./firebase";
 import { getDocTyped, setDocTyped, updateDocTyped } from "./firestore";
 import { getSnapshot, setState } from "../store/store";
 
@@ -20,22 +17,7 @@ function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
 }
 
-async function upsertGoogleUser(firebaseUser: import("firebase/auth").User): Promise<User> {
-  let profile = await getDocTyped<User>("users", firebaseUser.uid);
-  if (!profile) {
-    const user: User = {
-      id: firebaseUser.uid,
-      name: firebaseUser.displayName || "Google User",
-      email: normalizeEmail(firebaseUser.email || ""),
-      phone: firebaseUser.phoneNumber || undefined,
-      role: "patient" as Role,
-      active: true,
-    };
-    await setDocTyped<User>("users", user.id, user as any);
-    profile = user as User;
-  }
-  return profile;
-}
+
 
 export const authService = {
   async login(email: string, password: string) {
@@ -48,10 +30,6 @@ export const authService = {
   async register(name: string, email: string, phone: string, password: string, firstName?: string, lastName?: string, address?: string) {
     const res = await createUserWithEmailAndPassword(auth, normalizeEmail(email), password);
     if (name?.trim()) await updateFirebaseProfile(res.user, { displayName: name.trim() });
-
-    // Send verification email — free on all Firebase plans
-    const continueUrl = window.location.origin + window.location.pathname + "#/login";
-    await sendEmailVerification(res.user, { url: continueUrl, handleCodeInApp: false });
 
     const user: User = {
       id: res.user.uid,
@@ -69,13 +47,11 @@ export const authService = {
   },
 
   async googleSignIn(): Promise<void> {
-    await signInWithRedirect(auth, googleProvider);
+    // Handled by GoogleSignInButton component directly via signInWithPopup
   },
 
   async handleRedirectResult(): Promise<User | null> {
-    const result = await getRedirectResult(auth);
-    if (!result) return null;
-    return upsertGoogleUser(result.user);
+    return null;
   },
 
   async logout() {

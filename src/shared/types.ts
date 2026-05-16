@@ -162,6 +162,7 @@ export interface ClinicSettings {
   maxAppointmentsPerDay: number;
   allowEmergencyPriority: boolean;
   gcashNumber: string;
+  gcashQrUrl?: string;   // uploadable QR code image shown to patients
   bookingRules: string;
 }
 

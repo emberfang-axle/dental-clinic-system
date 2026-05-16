@@ -4,6 +4,7 @@ import { auth } from "./firebase";
 import { listenCollection, listenDoc, listCollection, setDocTyped, deleteDocTyped, qOrderBy, qWhere } from "./firestore";
 import { resetState, setState, getSnapshot, showToast } from "../store/store";
 import { scheduleAlertsService } from "./scheduleAlerts";
+import { reminderService } from "./reminderService";
 
 const DEFAULT_SERVICES: Omit<Service, "id">[] = [
   { name: "Oral Consultation",               price: 300,   duration: 20, description: "Initial check-up and dental assessment by the doctor." },
@@ -31,6 +32,9 @@ const DEFAULT_SERVICES: Omit<Service, "id">[] = [
 
 async function seedServices() {
   const existing = await listCollection<Service>("services");
+  // If all official services are already present, skip to avoid unnecessary reads/writes
+  if (existing.length >= DEFAULT_SERVICES.length) return;
+
   const officialNames = new Set(DEFAULT_SERVICES.map((s) => s.name.toLowerCase()));
 
   // Remove any doc not in the official list, and track duplicates
@@ -88,9 +92,9 @@ export function bootstrapRealtime() {
   const unsubAuth = onAuthStateChanged(auth, (firebaseUser) => {
     stopAll();
     // Preserve public data that's managed by always-on listeners
-    const { services, feedbacks, announcements } = getSnapshot();
+    const { services, feedbacks, announcements, waitlist, doctorSchedules } = getSnapshot();
     resetState();
-    setState({ services, feedbacks, announcements, authReady: true });
+    setState({ services, feedbacks, announcements, waitlist, doctorSchedules, authReady: true });
 
     // Settings
     unsubs.push(
@@ -104,15 +108,23 @@ export function bootstrapRealtime() {
     );
 
     if (!firebaseUser) {
-      setState({ user: null });
+      setState({ user: null, profileReady: true });
       return;
     }
+
+    // Safety timeout: if Firestore doesn't respond in 8s, unblock the UI
+    const profileTimeout = setTimeout(() => {
+      if (!getSnapshot().profileReady) {
+        setState({ profileReady: true });
+      }
+    }, 8000);
 
     let welcomeShown = false;
 
     // Profile
     unsubProfile = listenDoc<User>("users", firebaseUser.uid, (profile) => {
-      setState({ user: profile as any });
+      clearTimeout(profileTimeout);
+      setState({ user: profile as any, profileReady: true });
       attachRoleListeners(profile?.role ?? null);
       if (profile) {
         if (!welcomeShown) {
@@ -122,7 +134,10 @@ export function bootstrapRealtime() {
             profile.name;
           setTimeout(() => showToast(`Welcome back, ${label}!`, "success", 3500), 500);
         }
-        setTimeout(() => scheduleAlertsService.runForUser(profile), 3000);
+        setTimeout(() => {
+          scheduleAlertsService.runForUser(profile);
+          reminderService.run(getSnapshot().appointments);
+        }, 3000);
       }
     });
 
@@ -148,11 +163,16 @@ export function bootstrapRealtime() {
       usersUnsub?.();
 
       if (role === "patient") {
-        // where only, sort in JS
         appointmentUnsub = listenCollection<Appointment>(
           "appointments",
           (a) => setState({ appointments: [...a].sort(byDateDesc) }),
           [qWhere("patientId", "==", firebaseUser!.uid)] as any
+        );
+        // Patients need doctors list for booking
+        usersUnsub = listenCollection<User>(
+          "users",
+          (u) => setState({ users: u.filter((x) => x.role === "doctor" || x.role === "co-doctor") }),
+          [qWhere("role", "in", ["doctor", "co-doctor"])] as any
         );
       } else if (role) {
         // no where, orderBy only → single-field index

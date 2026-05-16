@@ -138,13 +138,6 @@ export function PatientHome({
         </div>
 
         <div className="space-y-4">
-          <div>
-            <button onClick={() => navigate(ROUTES.book)}
-              className="mt-2 w-full py-2.5 rounded-xl border border-gold-500/30 text-sm text-gold-300 hover:bg-gold-500/10 hover:border-gold-400/50 transition">
-              ➕ Book New Appointment
-            </button>
-          </div>
-
           {mine.length > 0 && (
             <div className="glass rounded-xl p-4 space-y-3">
               <p className="text-[10px] uppercase tracking-[0.2em] text-gold-300/55">Your Summary</p>

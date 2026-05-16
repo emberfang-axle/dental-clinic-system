@@ -9,6 +9,12 @@ import { useStore } from "./store/store";
 import { authService } from "./services/auth";
 import { ROUTES } from "./shared/constants";
 
+import { getRedirectResult } from "firebase/auth";
+import { auth } from "./services/firebase";
+
+// Clear any stale redirect state left over from the old Google Sign-In flow
+getRedirectResult(auth).catch(() => {});
+
 bootstrapRealtime();
 
 const IDLE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes

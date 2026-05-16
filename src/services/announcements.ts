@@ -2,6 +2,7 @@ import type { Announcement, Role } from "../shared/types";
 import { addDocTyped, deleteDocTyped, updateDocTyped } from "./firestore";
 import { getSnapshot, setState } from "../store/store";
 import { notificationsService } from "./notifications";
+import { emailService } from "./email";
 
 function nowISO() { return new Date().toISOString(); }
 
@@ -10,15 +11,16 @@ export const announcementsService = {
     const data = { title, body, author, authorRole, at: nowISO(), pinned };
     const id = await addDocTyped("announcements", data as any);
 
-    // Don't optimistically update store — the Firestore listener will add it,
-    // preventing duplicates when both the listener and optimistic update fire.
+    const { users } = getSnapshot();
 
-    // Notify patients in background
-    const snap = getSnapshot();
-    const patients = snap.users.filter((u) => u.role === "patient");
+    // In-app notifications + email all users via Resend
     Promise.all(
-      patients.map((u) => notificationsService.notify(u.id, `📢 ${title}`, body, "system"))
+      users.map((u) => notificationsService.notify(u.id, `📢 ${title}`, body, "system"))
     ).catch(() => {});
+
+    users.filter((u) => u.email).forEach((u) => {
+      void emailService.sendAnnouncement(u.email!, title, body);
+    });
 
     return { ...data, id } as Announcement;
   },

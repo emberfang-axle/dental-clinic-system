@@ -69,7 +69,7 @@ export function LandingPage({ navigate }: { navigate: (p: string) => void }) {
           <button onClick={() => navigate(ROUTES.home)} className="cursor-pointer hover:opacity-90 transition">
             <Logo size={42} />
           </button>
-          <nav className="hidden lg:flex items-center gap-9 text-[12px] uppercase tracking-[0.18em] text-gold-100/70 font-semibold">
+          <nav className="hidden lg:flex items-center gap-9 text-[12px] uppercase tracking-[0.18em] text-gold-100/70 font-semibold landing-nav">
             {NAV_LINKS.map(({ label, id }) => (
               <a key={id} onClick={() => scrollTo(id)} className="hover:text-gold-300 transition relative group whitespace-nowrap cursor-pointer">
                 {label}
@@ -115,7 +115,7 @@ export function LandingPage({ navigate }: { navigate: (p: string) => void }) {
       </header>
 
       {/* HERO */}
-      <section id="home" className="relative min-h-[70vh] flex items-center overflow-hidden pt-20">
+      <section id="home" className="relative min-h-[100svh] sm:min-h-[80vh] flex items-center overflow-hidden pt-20">
         <div className="absolute inset-0">
           <img src="/images/hero-dental.jpg" alt="" className="absolute inset-0 w-full h-full opacity-35" style={{ objectFit: "cover", objectPosition: "center center" }} />
           <div className="absolute inset-0 bg-linear-to-r from-ink-950 via-ink-950/80 to-ink-950/30" />
@@ -123,24 +123,24 @@ export function LandingPage({ navigate }: { navigate: (p: string) => void }) {
           <div className="absolute inset-0 pattern-grid opacity-40" />
         </div>
 
-        <div className="relative max-w-7xl mx-auto px-6 py-20 grid lg:grid-cols-12 gap-12 items-center w-full">
-          <div className="lg:col-span-7 fade-up">
-            <p className="text-[11px] uppercase tracking-[0.15em] sm:tracking-[0.25em] text-gold-200/90 font-medium mb-8">{CLINIC.address}</p>
-            <h1 className="font-serif font-light text-[2rem] sm:text-4xl lg:text-5xl xl:text-6xl leading-[0.95] tracking-tight">
+        <div className="relative max-w-7xl mx-auto px-5 sm:px-6 py-14 sm:py-20 grid lg:grid-cols-12 gap-10 items-center w-full">
+          <div className="lg:col-span-7 fade-up text-center lg:text-left">
+            <p className="text-[10px] sm:text-[11px] uppercase tracking-[0.15em] sm:tracking-[0.25em] text-gold-200/90 font-medium mb-5 sm:mb-8">{CLINIC.address}</p>
+            <h1 className="font-serif font-light text-[2.2rem] sm:text-5xl lg:text-5xl xl:text-6xl leading-[1.05] tracking-tight">
               <span className="block text-gold-50/95">A smile that</span>
               <span className="block text-gold-shine font-script italic font-normal mt-1">speaks luxury.</span>
             </h1>
-            <p className="mt-8 max-w-xl text-base md:text-lg text-gold-100/60 font-light leading-relaxed">
+            <p className="mt-6 sm:mt-8 max-w-xl mx-auto lg:mx-0 text-sm sm:text-base md:text-lg text-gold-100/60 font-light leading-relaxed">
               Estandarte Dental Clinic delivers refined, world-class dental care in the heart of Compostela.
               Trusted for over four years, modernized for the way you live today.
             </p>
-            <div className="mt-10 flex flex-wrap gap-4">
-              <Button size="lg" onClick={() => navigate(ROUTES.book)}>
+            <div className="mt-8 sm:mt-10 flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-3 sm:gap-4">
+              <Button size="lg" onClick={() => navigate(ROUTES.book)} className="w-full sm:w-auto">
                 Book Appointment
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14M13 5l7 7-7 7" /></svg>
               </Button>
-              <a href={`tel:+63${CLINIC.phone.replace(/\D/g, "").slice(1)}`}>
-                <Button size="lg" variant="outline">Call Us</Button>
+              <a href={`tel:+63${CLINIC.phone.replace(/\D/g, "").slice(1)}`} className="w-full sm:w-auto">
+                <Button size="lg" variant="outline" className="w-full">Call Us</Button>
               </a>
             </div>
           </div>
@@ -176,7 +176,7 @@ export function LandingPage({ navigate }: { navigate: (p: string) => void }) {
       </section>
 
       {/* MARQUEE */}
-      <div className="border-y border-gold-soft bg-ink-900/40 backdrop-blur overflow-hidden">
+      <div className="border-y border-gold-soft bg-ink-900/40 backdrop-blur overflow-hidden marquee-strip">
         <div className="max-w-7xl mx-auto px-6 py-5 flex items-center justify-around gap-8 text-[10px] uppercase tracking-[0.35em] text-gold-300/70 font-semibold">
           <span className="hidden sm:inline">★ Established {CLINIC.yearFounded}</span>
           <span className="hidden md:inline">·</span>
@@ -190,15 +190,15 @@ export function LandingPage({ navigate }: { navigate: (p: string) => void }) {
 
       {/* ABOUT */}
       <Section id="about" eyebrow="About the Clinic" title={<>Refined dentistry,<br/><span className="font-script italic">redefined for you.</span></>}>
-        <div className="grid lg:grid-cols-2 gap-12 items-center mt-4">
+        <div className="grid lg:grid-cols-2 gap-8 sm:gap-12 items-center mt-4">
           <div className="relative group">
             <div className="absolute inset-0 bg-gold-gradient rounded-2xl blur-2xl opacity-20 group-hover:opacity-30 transition" />
             <div className="relative rounded-2xl overflow-hidden border border-gold-500/30 shadow-luxe">
-              <img src="/images/clinic-interior.jpg" alt="Clinic interior" className="w-full h-120 object-cover transition-transform duration-700 group-hover:scale-105" />
-              <div className="absolute inset-0 bg-linear-to-t from-ink-950/80 via-transparent to-transparent" />
+              <img src="/images/clinic-interior.jpg" alt="Clinic interior" className="w-full h-64 sm:h-96 lg:h-120 object-cover transition-transform duration-700 group-hover:scale-105" />
+              <div className="absolute inset-0 photo-overlay" />
               <div className="absolute bottom-6 left-6 right-6">
                 <div className="text-[10px] uppercase tracking-[0.3em] text-gold-300 mb-2">Our Sanctuary</div>
-                <div className="font-serif text-2xl text-gold-50">A space designed for comfort.</div>
+                <div className="font-serif text-2xl text-white">A space designed for comfort.</div>
               </div>
             </div>
           </div>
@@ -315,28 +315,28 @@ export function LandingPage({ navigate }: { navigate: (p: string) => void }) {
       </Section>
 
       {/* DOCTOR */}
-      <section className="py-24 md:py-32 px-6 relative overflow-hidden">
+      <section className="py-20 sm:py-24 md:py-32 px-5 sm:px-6 relative overflow-hidden">
         <div className="absolute inset-0 bg-linear-to-b from-transparent via-gold-900/10 to-transparent" />
-        <div className="max-w-6xl mx-auto relative grid lg:grid-cols-5 gap-12 items-center">
-          <div className="lg:col-span-2 relative">
+        <div className="max-w-6xl mx-auto relative grid lg:grid-cols-5 gap-8 sm:gap-12 items-center">
+          <div className="lg:col-span-2 relative max-w-xs mx-auto w-full lg:max-w-none">
             <div className="absolute inset-0 bg-gold-gradient rounded-2xl blur-3xl opacity-20" />
-            <div className="relative rounded-2xl overflow-hidden border border-gold-500/30 shadow-luxe aspect-4/5">
+            <div className="relative rounded-2xl overflow-hidden border border-gold-500/30 shadow-luxe aspect-[4/5]">
               <img src="/images/doctor-portrait.png" alt="Lead dentist" className="w-full h-full object-cover" />
-              <div className="absolute inset-0 bg-linear-to-t from-ink-950/90 via-transparent to-transparent" />
+              <div className="absolute inset-0 photo-overlay" />
               <div className="absolute bottom-6 left-6 right-6">
                 <div className="text-[10px] uppercase tracking-[0.3em] text-gold-300 mb-1">Owner & Lead Dentist</div>
-                <div className="font-serif text-2xl text-gold-50">Dr. Mary Cris Estandarte</div>
-                <div className="text-xs text-gold-100/60 mt-1">D.M.D, Licensed Practitioner</div>
+                <div className="font-serif text-xl sm:text-2xl text-white">Dr. Mary Cris Estandarte</div>
+                <div className="text-xs text-white/70 mt-1">D.M.D, Licensed Practitioner</div>
               </div>
             </div>
           </div>
-          <div className="lg:col-span-3 space-y-6">
-            <Ornament className="w-24 h-3" />
+          <div className="lg:col-span-3 space-y-5 sm:space-y-6 text-center lg:text-left">
+            <Ornament className="w-24 h-3 mx-auto lg:mx-0" />
             <p className="text-[10px] uppercase tracking-[0.4em] text-gold-400 font-semibold">Meet The Doctor</p>
             <h2 className="font-serif text-3xl md:text-4xl font-light text-gold-shine leading-[1.1]">
               Care led by a <span className="font-script italic">trusted hand.</span>
             </h2>
-            <p className="text-gold-100/70 text-lg leading-relaxed font-light">
+            <p className="text-gold-100/70 text-base sm:text-lg leading-relaxed font-light">
               With over a decade of clinical experience and a deep belief that dentistry is both art and
               science, Dr. Estandarte oversees every aspect of your treatment — from the first consultation
               to your final result.
@@ -368,7 +368,7 @@ export function LandingPage({ navigate }: { navigate: (p: string) => void }) {
       <section className="px-6 pb-24">
         <div className="max-w-6xl mx-auto relative">
           <div className="absolute inset-0 bg-gold-gradient rounded-3xl blur-3xl opacity-20" />
-          <div className="relative rounded-3xl glass-strong border border-gold-500/30 p-12 md:p-20 text-center shadow-luxe overflow-hidden">
+          <div className="relative rounded-3xl glass-strong border border-gold-500/30 p-8 sm:p-12 md:p-20 text-center shadow-luxe overflow-hidden">
             <div className="absolute inset-0 pattern-gold opacity-40" />
             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-px h-16 bg-linear-to-b from-gold-400 to-transparent" />
             <div className="relative">
@@ -391,7 +391,7 @@ export function LandingPage({ navigate }: { navigate: (p: string) => void }) {
       {/* FOOTER */}
       <footer className="border-t border-gold-soft py-14 px-6 relative">
         <div className="max-w-7xl mx-auto">
-          <div className="grid md:grid-cols-4 gap-10 mb-10">
+          <div className="grid sm:grid-cols-2 md:grid-cols-4 gap-8 sm:gap-10 mb-10">
             <div className="md:col-span-2">
               <Logo size={42} />
               <p className="mt-5 text-sm text-gold-100/50 leading-relaxed max-w-md font-light">
@@ -417,8 +417,13 @@ export function LandingPage({ navigate }: { navigate: (p: string) => void }) {
               </ul>
             </div>
           </div>
-          <div className="pt-8 border-t border-gold-soft flex flex-col md:flex-row items-center justify-between gap-3 text-xs text-gold-100/40">
+          <div className="pt-8 border-t border-gold-soft flex flex-col items-center gap-3 text-xs text-gold-100/40 text-center md:flex-row md:justify-between">
             <div>© {new Date().getFullYear()} {CLINIC.name} · All rights reserved.</div>
+            <div className="flex items-center gap-4">
+              <a onClick={() => navigate("/privacy")} className="hover:text-gold-300 transition cursor-pointer">Privacy Policy</a>
+              <span>·</span>
+              <a onClick={() => navigate("/terms")} className="hover:text-gold-300 transition cursor-pointer">Terms of Service</a>
+            </div>
             <div className="text-[10px] uppercase tracking-[0.3em]">Crafted with ✦ for refined smiles</div>
           </div>
         </div>

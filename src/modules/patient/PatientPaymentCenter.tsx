@@ -1,29 +1,31 @@
 import { useState } from "react";
-import { Badge, Button, Card, Input, Label } from "../../components/ui";
+import { Badge, Button, Card } from "../../components/ui";
 import { useStore } from "../../store/store";
 import { downloadInvoice } from "../../utils/invoice";
-import { PaymentBadge } from "../appointment/AppointmentsList";
-import { AppointmentTimeline } from "../appointment/AppointmentsList";
+import { PaymentBadge, AppointmentTimeline } from "../appointment/AppointmentsList";
 import { paymentsService } from "../../services/payments";
 import { uploadFile } from "../../services/upload";
 
 function GCashSubmitForm({ appointmentId, price }: { appointmentId: string; price: number }) {
-  const { user } = useStore();
-  const [ref, setRef] = useState("");
+  const { user, settings } = useStore();
   const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
 
+  function handleFile(f: File | null) {
+    setFile(f);
+    if (f) setPreview(URL.createObjectURL(f));
+    else setPreview(null);
+  }
+
   async function submit() {
-    if (!ref.trim()) { setError("Please enter your GCash reference number."); return; }
+    if (!file) { setError("Please upload your GCash receipt screenshot."); return; }
     setSaving(true); setError("");
     try {
-      let screenshotUrl: string | undefined;
-      if (file) {
-        screenshotUrl = await uploadFile(file, `gcash/${appointmentId}/${file.name}`);
-      }
-      await paymentsService.saveProof(appointmentId, ref.trim(), screenshotUrl, user?.name ?? "patient");
+      const screenshotUrl = await uploadFile(file, `gcash/${appointmentId}/${Date.now()}-${file.name}`);
+      await paymentsService.saveProof(appointmentId, "", screenshotUrl, user?.name ?? "patient");
       setDone(true);
     } catch (e: any) {
       setError(e.message || "Failed to submit.");
@@ -34,25 +36,44 @@ function GCashSubmitForm({ appointmentId, price }: { appointmentId: string; pric
 
   if (done) return (
     <div className="rounded-xl border border-blue-500/30 bg-blue-500/8 p-4 text-sm text-blue-300">
-      ✓ GCash reference submitted. Staff will verify your payment shortly.
+      ✓ Receipt submitted. Staff will verify your payment shortly.
     </div>
   );
 
   return (
-    <div className="rounded-xl border border-gold-500/20 bg-ink-900/50 p-4 space-y-3">
-      <p className="text-xs uppercase tracking-wider text-gold-300/60">Submit GCash Payment · ₱{price.toLocaleString()}</p>
-      <div>
-        <Label>GCash Reference Number</Label>
-        <Input value={ref} onChange={(e) => setRef(e.target.value)} placeholder="e.g. 1234567890" />
-      </div>
-      <div>
-        <Label>Screenshot (optional)</Label>
+    <div className="rounded-xl border border-gold-500/20 bg-ink-900/50 p-4 space-y-4">
+      <p className="text-xs uppercase tracking-wider text-gold-300/60">GCash Payment · ₱{price.toLocaleString()}</p>
+
+      {/* Step 1: Scan QR */}
+      {settings?.gcashQrUrl && (
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-gold-200">Step 1 — Scan the clinic QR code</p>
+          <img src={settings.gcashQrUrl} alt="GCash QR Code" className="w-40 h-40 object-contain rounded-lg border border-gold-500/20 bg-white p-1" />
+          {settings.gcashNumber && (
+            <p className="text-xs text-gold-100/55">GCash number: <span className="text-gold-300 font-mono">{settings.gcashNumber}</span></p>
+          )}
+        </div>
+      )}
+      {!settings?.gcashQrUrl && settings?.gcashNumber && (
+        <div className="space-y-1">
+          <p className="text-xs font-medium text-gold-200">Step 1 — Send payment via GCash</p>
+          <p className="text-xs text-gold-100/55">GCash number: <span className="text-gold-300 font-mono">{settings.gcashNumber}</span></p>
+        </div>
+      )}
+
+      {/* Step 2: Upload receipt */}
+      <div className="space-y-2">
+        <p className="text-xs font-medium text-gold-200">Step 2 — Upload your receipt screenshot</p>
         <input type="file" accept="image/*"
-          className="mt-1 w-full text-sm text-gold-100/70 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border file:border-gold-500/30 file:bg-ink-900/60 file:text-gold-200 file:text-xs file:cursor-pointer"
-          onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+          className="w-full text-sm text-gold-100/70 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border file:border-gold-500/30 file:bg-ink-900/60 file:text-gold-200 file:text-xs file:cursor-pointer"
+          onChange={(e) => handleFile(e.target.files?.[0] ?? null)} />
+        {preview && (
+          <img src={preview} alt="Receipt preview" className="w-32 h-32 object-cover rounded-lg border border-gold-500/20" />
+        )}
       </div>
+
       {error && <p className="text-xs text-red-300">{error}</p>}
-      <Button size="sm" disabled={saving} onClick={submit}>{saving ? "Submitting…" : "Submit Payment Proof"}</Button>
+      <Button size="sm" disabled={saving || !file} onClick={submit}>{saving ? "Uploading…" : "Submit Receipt"}</Button>
     </div>
   );
 }
@@ -103,12 +124,12 @@ export function PatientPaymentCenter() {
                   ✓ Payment verified. Receipt will be issued after treatment completion.
                 </div>
               )}
-              {a.paymentStatus === "unpaid" && a.paymentMethod === "gcash" && (
+              {a.paymentStatus === "unpaid" && a.status === "completed" && (
                 <GCashSubmitForm appointmentId={a.id} price={a.price} />
               )}
-              {a.paymentStatus === "unpaid" && a.paymentMethod === "cash" && (
+              {a.paymentStatus === "unpaid" && a.status !== "completed" && (
                 <div className="rounded-xl border border-gold-500/15 bg-ink-900/55 p-4 text-sm text-gold-100/65">
-                  Cash payment will be collected at the clinic.
+                  Payment will be collected after your treatment is completed.
                 </div>
               )}
               {a.paymentStatus === "partial_paid" && (

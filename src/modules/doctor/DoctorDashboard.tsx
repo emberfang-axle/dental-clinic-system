@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { Card } from "../../components/ui";
-import { StatGrid, TodaySchedule, AlertBanner, OverviewHeader, WeeklyMiniCalendar } from "../../components/ui/DashboardWidgets";
+import { StatGrid, TodaySchedule, AlertBanner, WeeklyMiniCalendar } from "../../components/ui/DashboardWidgets";
 import { DashboardLayout } from "../../components/layout/DashboardLayout";
 import { useStore } from "../../store/store";
 import { DASHBOARD_TABS } from "../../shared/constants";
@@ -69,9 +69,6 @@ function DoctorOverview({ onTabChange }: { onTabChange: (t: string) => void }) {
 
   return (
     <div className="space-y-6">
-      <OverviewHeader role="Doctor Panel" name={user.name}
-        sub={new Date().toLocaleDateString("en-PH", { weekday: "long", month: "long", day: "numeric" })} />
-
       {pending.length > 0 && (
         <AlertBanner message={`⚠ ${pending.length} appointment${pending.length > 1 ? "s" : ""} awaiting confirmation`}
           action="Review" onAction={() => onTabChange("appointments")} />

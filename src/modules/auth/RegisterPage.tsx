@@ -6,6 +6,7 @@ import { dashboardPathFor } from "../../shared/helpers";
 import { ROUTES } from "../../shared/constants";
 import { AuthLayout, AuthHeader } from "./AuthLayout";
 
+
 export function RegisterPage({ navigate }: { navigate: (p: string) => void }) {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -16,7 +17,6 @@ export function RegisterPage({ navigate }: { navigate: (p: string) => void }) {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [verifyEmail, setVerifyEmail] = useState("");
   const { user } = useStore();
 
   useEffect(() => {
@@ -34,12 +34,13 @@ export function RegisterPage({ navigate }: { navigate: (p: string) => void }) {
     if (password.length < 6) { setError("Password must be at least 6 characters."); return; }
     if (password !== confirmPassword) { setError("Passwords do not match."); return; }
     setLoading(true);
-    const fullName = `${firstName.trim()} ${lastName.trim()}`;
     try {
-      await authService.register(fullName, email, phone, password, firstName.trim(), lastName.trim(), address.trim());
-      // Sign out immediately — user must verify email before accessing the system
-      await authService.logout();
-      setVerifyEmail(email);
+      await authService.register(
+        `${firstName.trim()} ${lastName.trim()}`,
+        email, phone, password,
+        firstName.trim(), lastName.trim(), address.trim()
+      );
+      // onAuthStateChanged in bootstrap will set user → useEffect above navigates to dashboard
     } catch (err: any) {
       const code = err?.code ?? "";
       if (code === "auth/email-already-in-use") {
@@ -51,24 +52,6 @@ export function RegisterPage({ navigate }: { navigate: (p: string) => void }) {
       }
       setLoading(false);
     }
-  }
-
-  if (verifyEmail) {
-    return (
-      <AuthLayout navigate={navigate}>
-        <div className="w-full max-w-md fade-up text-center space-y-5">
-          <div className="text-5xl">✉️</div>
-          <h2 className="font-serif text-2xl text-gold-shine">Check your email</h2>
-          <p className="text-sm text-gold-100/60 leading-relaxed">
-            We sent a verification link to{" "}
-            <span className="text-gold-300 font-medium">{verifyEmail}</span>.
-            Click the link in the email to activate your account, then sign in.
-          </p>
-          <Button className="w-full" onClick={() => navigate(ROUTES.login)}>Go to Sign In</Button>
-          <p className="text-xs text-gold-100/40">Didn't receive it? Check your spam folder.</p>
-        </div>
-      </AuthLayout>
-    );
   }
 
   return (
@@ -115,6 +98,8 @@ export function RegisterPage({ navigate }: { navigate: (p: string) => void }) {
               {loading ? "Creating Account…" : "Create Account"}
             </Button>
           </form>
+
+
         </div>
         <p className="text-center text-sm text-gold-100/55 mt-6 font-light">
           Already a member?{" "}

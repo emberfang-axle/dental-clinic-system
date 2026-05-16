@@ -7,7 +7,7 @@ import type { Appointment, AppointmentStatus, PaymentStatus, Role } from "../../
 
 const PAGE_SIZE = 10;
 
-export function AppointmentsList({ role, patientOnly }: { role: Role; patientOnly?: boolean }) {
+export function AppointmentsList({ role, patientOnly }: { role: Role | "admin"; patientOnly?: boolean }) {
   const { appointments = [], user } = useStore();
   const [filter, setFilter] = useState<"all" | AppointmentStatus>("all");
   const [search, setSearch] = useState("");
@@ -142,7 +142,7 @@ export function AppointmentsList({ role, patientOnly }: { role: Role; patientOnl
   );
 }
 
-const AppointmentCard = memo(function AppointmentCard({ a, role, isSelf, actor }: { a: Appointment; role: Role; isSelf: boolean; actor: string }) {
+const AppointmentCard = memo(function AppointmentCard({ a, role, isSelf, actor }: { a: Appointment; role: Role | "admin"; isSelf: boolean; actor: string }) {
   const { appointments } = useStore();
   const [rescheduling, setRescheduling] = useState(false);
   const [newDate, setNewDate] = useState(a.date);
@@ -227,16 +227,16 @@ const AppointmentCard = memo(function AppointmentCard({ a, role, isSelf, actor }
       )}
 
       <div className="mt-3 flex flex-wrap gap-2">
-        {role === "doctor" && a.status === "pending" && (
+        {(role === "doctor" || role === "admin") && a.status === "pending" && (
           <Button size="sm" onClick={() => update({ status: "confirmed" })}>Confirm</Button>
         )}
-        {role === "doctor" && a.status === "confirmed" && (
+        {(role === "doctor" || role === "admin") && a.status === "confirmed" && (
           <Button size="sm" onClick={() => update({ status: "in-progress" })}>Start</Button>
         )}
-        {role === "doctor" && a.status === "in-progress" && (
+        {(role === "doctor" || role === "admin") && a.status === "in-progress" && (
           <Button size="sm" onClick={() => update({ status: "completed" })}>Complete</Button>
         )}
-        {role === "doctor" && (a.status === "confirmed" || a.status === "in-progress") && (
+        {(role === "doctor" || role === "admin") && (a.status === "confirmed" || a.status === "in-progress") && (
           <Button size="sm" variant="ghost" onClick={() => update({ status: "no-show" })}>No Show</Button>
         )}
         {role === "staff" && a.status === "pending" && (
