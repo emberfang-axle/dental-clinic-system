@@ -161,7 +161,7 @@ function PaymentActions({ a, onUpdate, actor }: {
   const [imgOpen, setImgOpen] = useState(false);
 
   if (a.paymentStatus === "paid") {
-    return <p className="text-xs text-emerald-400">✓ Paid via {a.paymentMethod === "gcash" ? "GCash" : "Cash"}</p>;
+    return <p className="text-xs text-emerald-400">Paid via {a.paymentMethod === "gcash" ? "GCash" : "Cash"}</p>;
   }
 
   // Payment can only be collected after treatment is done
@@ -173,7 +173,7 @@ function PaymentActions({ a, onUpdate, actor }: {
   if (a.paymentStatus === "pending_verification") {
     return (
       <div className="space-y-2">
-        <p className="text-xs text-blue-300 font-medium">⏳ GCash receipt submitted — review and confirm</p>
+        <p className="text-xs text-blue-300 font-medium">GCash receipt submitted — review and confirm</p>
         {a.paymentScreenshotUrl && (
           <div>
             <button
@@ -200,7 +200,7 @@ function PaymentActions({ a, onUpdate, actor }: {
         )}
         <div className="flex gap-2 flex-wrap">
           <Button size="sm" onClick={() => onUpdate(a.id, { paymentMethod: "gcash", paymentStatus: "paid" })}>
-            ✓ Mark Paid (GCash)
+            Mark Paid (GCash)
           </Button>
           <Button size="sm" variant="ghost" onClick={() => onUpdate(a.id, { paymentStatus: "unpaid" })}>
             Reject

@@ -37,7 +37,7 @@ export interface AppState {
   doctorSchedules: DoctorSchedule[];
 }
 
-let state: AppState = {
+const INITIAL_STATE: AppState = {
   authReady: false,
   profileReady: false,
   user: null,
@@ -54,6 +54,8 @@ let state: AppState = {
   waitlist: [],
   doctorSchedules: [],
 };
+
+let state: AppState = { ...INITIAL_STATE };
 
 type Listener = () => void;
 const listeners = new Set<Listener>();
@@ -73,23 +75,7 @@ export function setState(partial: Partial<AppState>) {
 }
 
 export function resetState() {
-  state = {
-    authReady: false,
-    profileReady: false,
-    user: null,
-    users: [],
-    services: [],
-    appointments: [],
-    logs: [],
-    notifications: [],
-    feedbacks: [],
-    settings: {} as ClinicSettings,
-    staffPermissions: [],
-    announcements: [],
-    toasts: [],
-    waitlist: [],
-    doctorSchedules: [],
-  };
+  state = { ...INITIAL_STATE };
   listeners.forEach((l) => l());
 }
 

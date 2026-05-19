@@ -65,7 +65,7 @@ export default function App() {
 
   useEffect(() => {
     if (redirect) navigate(redirect);
-  }, [redirect]);
+  }, [redirect]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!authReady || !profileReady || redirect) return (
     <div className="min-h-screen bg-ink-950 flex items-center justify-center">

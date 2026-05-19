@@ -24,7 +24,7 @@ export const BOOKING = {
  */
 export const DASHBOARD_TABS: Record<Role, DashboardTab[]> = {
   admin: [
-    { id: "overview",      label: "Overview",          icon: "" },
+    { id: "overview",      label: "Dashboard",         icon: "" },
     // ── alphabetical ──
     { id: "announcements", label: "Announcements",     icon: "" },
     { id: "appointments",  label: "Appointments",      icon: "" },
@@ -42,7 +42,7 @@ export const DASHBOARD_TABS: Record<Role, DashboardTab[]> = {
     { id: "settings",      label: "Integrations",      icon: "" },
   ],
   doctor: [
-    { id: "overview",      label: "Overview",          icon: "" },
+    { id: "overview",      label: "Dashboard",         icon: "" },
     // ── alphabetical ──
     { id: "announcements", label: "Announcements",     icon: "" },
     { id: "appointments",  label: "Appointments",      icon: "" },
@@ -69,7 +69,7 @@ export const DASHBOARD_TABS: Record<Role, DashboardTab[]> = {
     { id: "profile",       label: "My Profile",      icon: "" },
   ],
   staff: [
-    { id: "overview",      label: "Overview",          icon: "" },
+    { id: "overview",      label: "Dashboard",         icon: "" },
     // ── alphabetical ──
     { id: "appointments",  label: "Appointments",      icon: "" },
     { id: "queue",         label: "Daily Queue",       icon: "" },

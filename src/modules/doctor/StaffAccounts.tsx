@@ -160,7 +160,7 @@ export function StaffAccounts() {
           >
             {creating ? "Creating..." : `Add ${newStaff.role === "co-doctor" ? "Co-Doctor" : "Staff Member"}`}
           </Button>
-          {created && <p className="mt-3 text-sm text-emerald-400">✓ Account created. They can log in at /admin-login.</p>}
+          {created && <p className="mt-3 text-sm text-emerald-400">Account created. They can log in at /admin-login.</p>}
           {createError && <p className="mt-3 text-sm text-red-400">{createError}</p>}
         </Card>
       </div>

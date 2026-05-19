@@ -15,6 +15,7 @@ export interface MedicalHistory {
 
 export interface User {
   id: string;
+  patientNo?: string;        // Human-readable ID e.g. "PT-0001" — patients only
   name: string;
   firstName?: string;
   lastName?: string;
@@ -81,6 +82,12 @@ export interface Appointment {
   diagnosis?: string;
   treatmentPlan?: string;
   dentalHistory?: string;
+  // Progress Note fields
+  complaint?: string;
+  prescription?: string;
+  followUpDate?: string;
+  progressNoteAt?: string;   // ISO timestamp of when the progress note was first saved
+  progressNoteBy?: string;   // doctor name who wrote the note
   toothChart?: Record<string, string>; // toothNumber → condition
   beforeImageUrl?: string;
   afterImageUrl?: string;

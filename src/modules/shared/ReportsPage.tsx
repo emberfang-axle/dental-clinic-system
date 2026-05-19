@@ -211,11 +211,12 @@ export function ReportsPage() {
 
   // ── patients ──
   const patientMap = useMemo(() => {
-    const map: Record<string, { name: string; count: number; spent: number }> = {};
+    const map: Record<string, { name: string; count: number; spent: number; billed: number }> = {};
     appointments.forEach((a) => {
-      if (!map[a.patientId]) map[a.patientId] = { name: a.patientName, count: 0, spent: 0 };
+      if (!map[a.patientId]) map[a.patientId] = { name: a.patientName, count: 0, spent: 0, billed: 0 };
       map[a.patientId].count++;
       if (a.paymentStatus === "paid") map[a.patientId].spent += a.price;
+      if (a.status !== "cancelled") map[a.patientId].billed += a.price;
     });
     return map;
   }, [appointments]);
@@ -223,7 +224,7 @@ export function ReportsPage() {
   const visitCounts  = Object.values(patientMap);
   const returning    = visitCounts.filter((p) => p.count >= 2).length;
   const retentionRate = visitCounts.length ? Math.round((returning / visitCounts.length) * 100) : 0;
-  const topPatients  = [...visitCounts].sort((a, b) => b.spent - a.spent).slice(0, 5);
+  const topPatients  = [...visitCounts].sort((a, b) => b.billed - a.billed || b.count - a.count).slice(0, 5);
 
   // ── payment ──
   const gcashCount = paid.filter((a) => a.paymentMethod === "gcash").length;
@@ -411,7 +412,7 @@ export function ReportsPage() {
         </Card>
 
         <Card>
-          <h3 className="font-serif text-xl text-gold-gradient mb-4">Top Patients by Spending</h3>
+          <h3 className="font-serif text-xl text-gold-gradient mb-4">Top Patients by Visits</h3>
           {topPatients.length === 0
             ? <p className="text-sm text-gold-100/50">No patient data yet.</p>
             : (
@@ -422,7 +423,15 @@ export function ReportsPage() {
                       <span className="text-gold-400/60 font-mono text-xs shrink-0">#{i + 1}</span>
                       <span className="text-gold-100/75 truncate">{p.name}</span>
                     </div>
-                    <span className="text-gold-300 font-mono text-xs shrink-0">{p.count} visit{p.count !== 1 ? "s" : ""} · ₱{p.spent.toLocaleString()}</span>
+                    <div className="text-right shrink-0">
+                      <div className="text-gold-300 font-mono text-xs">{p.count} visit{p.count !== 1 ? "s" : ""} · ₱{p.billed.toLocaleString()}</div>
+                      {p.spent < p.billed && (
+                        <div className="text-[10px] text-amber-400/70">₱{(p.billed - p.spent).toLocaleString()} unpaid</div>
+                      )}
+                      {p.spent === p.billed && p.billed > 0 && (
+                        <div className="text-[10px] text-emerald-400/70">fully paid</div>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>

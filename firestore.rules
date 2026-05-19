@@ -18,10 +18,10 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if authed();
 
-      // Self-register as patient only
+      // Self-register: patient self-registration OR any non-admin role creating own profile
       allow create: if authed()
         && uid() == userId
-        && request.resource.data.role == 'patient';
+        && request.resource.data.role in ['patient', 'staff', 'doctor', 'co-doctor'];
 
       // Own profile update — cannot escalate own role
       allow update: if authed()
@@ -59,6 +59,8 @@ service cloud.firestore {
           request.resource.data.paymentStatus == resource.data.paymentStatus &&
           request.resource.data.paymentMethod == resource.data.paymentMethod &&
           (
+            // Allow calendarEventId patch right after booking
+            (request.resource.data.status == resource.data.status) ||
             (request.resource.data.status == 'cancelled'   && resource.data.status in ['pending', 'confirmed']) ||
             (request.resource.data.status == 'rescheduled' && resource.data.status in ['pending', 'confirmed'])
           )
@@ -122,6 +124,12 @@ service cloud.firestore {
 
     // ── DOCTOR SCHEDULES ──────────────────────────────────
     match /doctorSchedules/{docId} {
+      allow read: if true;
+      allow write: if authed() && isAdminOrDoctor();
+    }
+
+    // ── BLOCKED SLOTS ─────────────────────────────────────
+    match /blockedSlots/{slotId} {
       allow read: if true;
       allow write: if authed() && isAdminOrDoctor();
     }

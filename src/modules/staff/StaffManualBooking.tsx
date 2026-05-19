@@ -8,6 +8,7 @@ import { Button, Input, Label, Select } from "../../components/ui";
 import { appointmentsService } from "../../services/appointments";
 import { useStore } from "../../store/store";
 import { BOOKING } from "../../shared/constants";
+import { KNOWN_DOCTOR_NAMES } from "../../services/bootstrap";
 import type { AppointmentSource } from "../../shared/types";
 
 const defaultDoctors: string[] = [];
@@ -21,7 +22,7 @@ const tomorrow = () => {
 export function StaffManualBooking({ onClose }: { onClose: () => void }) {
   const { services, users } = useStore();
   const dbDoctors = users
-    .filter((u) => (u.role === "doctor" || u.role === "co-doctor") && u.active !== false)
+    .filter((u) => (u.role === "doctor" || u.role === "co-doctor") && u.active !== false && KNOWN_DOCTOR_NAMES.has(u.name))
     .map((u) => u.name);
   const doctorOptions = [...new Set([...defaultDoctors, ...dbDoctors])];
 
@@ -42,6 +43,7 @@ export function StaffManualBooking({ onClose }: { onClose: () => void }) {
     e.preventDefault();
     setError("");
     if (!patientName.trim()) { setError("Patient name is required."); return; }
+    if (patientPhone.trim() && !/^09\d{9}$/.test(patientPhone.replace(/\s/g, ""))) { setError("Phone must be a valid PH mobile number (e.g. 09xx xxx xxxx)."); return; }
     if (!time) { setError("Please select a time slot."); return; }
     if (new Date(date + "T00:00:00").getDay() === 0) { setError("Clinic is closed on Sundays."); return; }
     if (!service) return;
@@ -77,7 +79,9 @@ export function StaffManualBooking({ onClose }: { onClose: () => void }) {
   if (done) {
     return (
       <div className="text-center py-6 space-y-4">
-        <div className="text-4xl">✓</div>
+        <div className="w-16 h-16 mx-auto rounded-full bg-emerald-500/15 border border-emerald-400/30 flex items-center justify-center mb-6">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#34d399" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
         <p className="text-gold-100 font-medium">Appointment booked for <span className="text-gold-300">{patientName}</span></p>
         <p className="text-xs text-gold-100/50">{service?.name} · {date} at {time}</p>
         <div className="flex justify-center gap-3 pt-2">
@@ -90,6 +94,9 @@ export function StaffManualBooking({ onClose }: { onClose: () => void }) {
 
   return (
     <form onSubmit={submit} className="space-y-4">
+      <div className="rounded-lg border border-gold-500/20 bg-gold-500/5 px-3 py-2 text-xs text-gold-100/60">
+        If the patient has a registered account, their appointment will appear in their dashboard automatically. Walk-in patients without an account can register at <span className="text-gold-300">the login page</span>.
+      </div>
       <div className="grid sm:grid-cols-2 gap-4">
         <div>
           <Label htmlFor="mb-name">Patient Name</Label>

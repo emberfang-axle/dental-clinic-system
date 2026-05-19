@@ -2,9 +2,11 @@
  * Shared overview widgets — used by all role dashboards.
  * No role-specific logic here.
  */
-import { useState, type ReactNode } from "react";
+import { useState, useMemo } from "react";
 import { Badge } from "../ui";
-import type { Appointment } from "../../shared/types";
+import { appointmentsService } from "../../services/appointments";
+import { useStore } from "../../store/store";
+import type { Appointment, AppointmentStatus } from "../../shared/types";
 
 // ── Stat tile grid ────────────────────────────────────────────────────────
 interface Stat {
@@ -97,26 +99,189 @@ export function AlertBanner({ message, action, onAction, tone = "amber" }: {
   );
 }
 
-// ── Overview page header (date + optional action) ─────────────────────────
-export function OverviewHeader({ role, name, sub, children }: {
-  role: string;
-  name: string;
-  sub?: string;
-  children?: ReactNode;
-}) {
+// ── Latest announcement card ──────────────────────────────────────────────
+export function LatestAnnouncement({ onViewAll }: { onViewAll: () => void }) {
+  const { announcements } = useStore();
+  const latest = announcements[0];
+  if (!latest) return null;
   return (
-    <div className="glass-strong rounded-2xl p-6 flex flex-wrap items-center justify-between gap-4">
-      <div>
-        <p className="text-[10px] uppercase tracking-[0.26em] text-gold-300/55">{role}</p>
-        <h2 className="font-serif text-3xl text-gold-shine mt-1">{name}</h2>
-        {sub && <p className="text-sm text-gold-100/50 mt-1">{sub}</p>}
-      </div>
-      {children}
+    <div className="glass rounded-xl p-4 space-y-2">
+      <p className="text-[10px] uppercase tracking-[0.2em] text-gold-300/55">Latest Announcement</p>
+      {latest.pinned && <span className="text-[10px] text-amber-300/70 uppercase tracking-wider">Pinned</span>}
+      <p className="font-medium text-gold-100 text-sm">{latest.title}</p>
+      <p className="text-xs text-gold-100/55 line-clamp-3">{latest.body}</p>
+      <button onClick={onViewAll} className="text-xs text-gold-400/60 hover:text-gold-300 transition">View all →</button>
     </div>
   );
 }
 
-// ── Reusable weekly mini-calendar ─────────────────────────────────────────
+// ── Quick action button list ──────────────────────────────────────────────
+export function QuickActions({ actions }: { actions: { label: string; onClick: () => void }[] }) {
+  return (
+    <div className="glass rounded-xl p-4 space-y-2">
+      <p className="text-[10px] uppercase tracking-[0.2em] text-gold-300/55">Quick Actions</p>
+      {actions.map((a) => (
+        <button key={a.label} onClick={a.onClick}
+          className="w-full text-left px-3 py-2.5 rounded-lg text-sm text-gold-100/70 hover:bg-gold-500/10 hover:text-gold-200 transition border border-gold-500/15">
+          {a.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ── Revenue sparkline ─────────────────────────────────────────────────────
+export function RevenueSparkline({ appointments: appts }: { appointments: Appointment[] }) {
+  const { data, months } = useMemo(() => {
+    const now = new Date();
+    const map: Record<string, number> = {};
+    const labels: string[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = d.toISOString().slice(0, 7);
+      map[key] = 0;
+      labels.push(d.toLocaleDateString("en-PH", { month: "short" }));
+    }
+    appts.filter((a) => a.paymentStatus === "paid").forEach((a) => {
+      const m = a.date.slice(0, 7);
+      if (m in map) map[m] += a.price;
+    });
+    return { data: Object.values(map), months: labels };
+  }, [appts]);
+
+  const max = Math.max(...data, 1);
+  const points = data.map((v, i) => {
+    const x = data.length > 1 ? (i / (data.length - 1)) * 100 : 50;
+    const y = 100 - (v / max) * 80 - 10;
+    return `${x},${y}`;
+  }).join(" ");
+
+  return (
+    <div className="glass rounded-xl p-4">
+      <p className="text-[10px] uppercase tracking-[0.2em] text-gold-300/55 mb-3">Revenue — Last 6 Months</p>
+      <svg viewBox="0 0 100 60" className="w-full h-16" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="sparkGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#dab23c" stopOpacity="0.3" />
+            <stop offset="100%" stopColor="#dab23c" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <polyline fill="none" stroke="#dab23c" strokeWidth="1.5" strokeLinejoin="round" points={points} />
+        <polygon fill="url(#sparkGrad)" points={`0,100 ${points} 100,100`} />
+        {data.map((v, i) => {
+          const x = data.length > 1 ? (i / (data.length - 1)) * 100 : 50;
+          const y = 100 - (v / max) * 80 - 10;
+          return <circle key={i} cx={x} cy={y} r="2" fill="#dab23c" />;
+        })}
+      </svg>
+      <div className="flex justify-between mt-1">
+        {months.map((m) => <span key={m} className="text-[9px] text-gold-100/30">{m}</span>)}
+      </div>
+      <div className="flex justify-between mt-2">
+        {data.map((v, i) => (
+          <span key={i} className="text-[9px] text-gold-300/50 font-mono">
+            {v >= 1000 ? `₱${(v / 1000).toFixed(0)}k` : v > 0 ? `₱${v}` : "—"}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Appointment row with inline status actions (admin/doctor overview) ────
+export function AppointmentActionRow({ appt: a }: { appt: Appointment }) {
+  const { user } = useStore();
+  const [updating, setUpdating] = useState<AppointmentStatus | null>(null);
+  const [error, setError] = useState("");
+
+  async function setStatus(status: AppointmentStatus) {
+    setUpdating(status); setError("");
+    try {
+      await appointmentsService.update(a.id, { status }, user?.name ?? "admin");
+    } catch (e: any) {
+      setError(e.message || "Failed.");
+    } finally { setUpdating(null); }
+  }
+
+  const nextActions: { label: string; status: AppointmentStatus }[] =
+    a.status === "pending"     ? [{ label: "Confirm",  status: "confirmed"   }] :
+    a.status === "confirmed"   ? [{ label: "Start",    status: "in-progress" }] :
+    a.status === "in-progress" ? [{ label: "Complete", status: "completed"   }] : [];
+
+  return (
+    <div className="glass rounded-xl px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+      <div className="flex items-center gap-3 min-w-0">
+        <span className="font-mono text-gold-300 text-sm shrink-0">{a.time}</span>
+        <div className="min-w-0">
+          <p className="font-medium text-gold-100 text-sm truncate">{a.patientName}</p>
+          <p className="text-xs text-gold-100/50 truncate">{a.serviceName} · {a.doctor}</p>
+        </div>
+      </div>
+      <div className="flex items-center gap-2 shrink-0 flex-wrap">
+        {a.emergency && <Badge tone="emergency">Priority</Badge>}
+        <Badge tone={a.status as any}>{a.status}</Badge>
+        <Badge tone={a.paymentStatus === "paid" ? "paid" : "neutral"}>
+          {a.paymentStatus === "paid" ? `Paid · ${a.paymentMethod === "gcash" ? "GCash" : "Cash"}` : "Unpaid"}
+        </Badge>
+        {nextActions.map(({ label, status }) => (
+          <button key={status} disabled={!!updating} onClick={() => setStatus(status)}
+            className="text-[10px] px-2.5 py-1 rounded-full border border-gold-500/30 text-gold-300 hover:bg-gold-500/10 transition disabled:opacity-50">
+            {updating === status ? "…" : label}
+          </button>
+        ))}
+      </div>
+      {error && <p className="w-full text-xs text-red-400">{error}</p>}
+    </div>
+  );
+}
+
+// ── Weekly mini-calendar ──────────────────────────────────────────────────
+function DayCell({ d, todayStr, appointments, onTabChange }: {
+  d: Date;
+  todayStr: string;
+  appointments: Appointment[];
+  onTabChange: (t: string) => void;
+}) {
+  const dateStr = d.toISOString().slice(0, 10);
+  const isToday  = dateStr === todayStr;
+  const isSunday = d.getDay() === 0;
+  const dayAppts = appointments.filter((a) => a.date === dateStr && a.status !== "cancelled");
+  const hasPending   = dayAppts.some((a) => a.status === "pending");
+  const hasEmergency = dayAppts.some((a) => a.emergency);
+
+  return (
+    <button onClick={() => !isSunday && onTabChange("appointments")} disabled={isSunday}
+      className={`relative rounded-xl p-2 text-center transition-all ${
+        isToday    ? "border border-gold-400/60 bg-gold-500/12 shadow-luxe"
+        : isSunday ? "border border-gold-500/8 opacity-40 cursor-not-allowed"
+        : "border border-gold-500/15 hover:border-gold-400/40 hover:bg-gold-500/5"
+      }`}>
+      <div className={`text-[10px] uppercase tracking-wider mb-1 ${isToday ? "text-gold-300" : "text-gold-100/40"}`}>
+        {d.toLocaleDateString("en-PH", { weekday: "short" })}
+      </div>
+      <div className={`font-serif text-lg leading-none ${isToday ? "text-gold-shine" : "text-gold-100/70"}`}>
+        {d.getDate()}
+      </div>
+      {isSunday ? (
+        <div className="text-[9px] text-gold-100/25 mt-1">Closed</div>
+      ) : dayAppts.length > 0 ? (
+        <div className="mt-1.5 space-y-0.5">
+          <div className={`text-[10px] font-semibold ${isToday ? "text-gold-300" : "text-gold-100/60"}`}>
+            {dayAppts.length} appt{dayAppts.length !== 1 ? "s" : ""}
+          </div>
+          <div className="flex justify-center gap-1">
+            {hasEmergency && <span className="w-1.5 h-1.5 rounded-full bg-red-400" />}
+            {hasPending   && <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />}
+            {!hasEmergency && !hasPending && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />}
+          </div>
+        </div>
+      ) : (
+        <div className="text-[9px] text-gold-100/20 mt-1">—</div>
+      )}
+    </button>
+  );
+}
+
 export function WeeklyMiniCalendar({ appointments, onTabChange }: {
   appointments: Appointment[];
   onTabChange: (t: string) => void;
@@ -124,8 +289,9 @@ export function WeeklyMiniCalendar({ appointments, onTabChange }: {
   const [weekOffset, setWeekOffset] = useState(0);
 
   const today = new Date();
-  const dayOfWeek = today.getDay();
+  const todayStr = today.toISOString().slice(0, 10);
   const monday = new Date(today);
+  const dayOfWeek = today.getDay();
   monday.setDate(today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1) + weekOffset * 7);
 
   const days = Array.from({ length: 7 }, (_, i) => {
@@ -135,12 +301,11 @@ export function WeeklyMiniCalendar({ appointments, onTabChange }: {
   });
 
   const weekLabel = `${days[0].toLocaleDateString("en-PH", { month: "short", day: "numeric" })} – ${days[6].toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })}`;
-  const todayStr = today.toISOString().slice(0, 10);
 
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-        <p className="font-serif text-xl text-gold-shine">Weekly Overview</p>
+        <p className="font-serif text-xl text-gold-shine">Weekly Dashboard</p>
         <div className="flex items-center gap-1.5 flex-wrap">
           <button onClick={() => setWeekOffset((o) => o - 1)} className="h-7 w-7 rounded-lg border border-gold-500/25 text-gold-300 hover:bg-gold-500/10 transition text-sm flex items-center justify-center">‹</button>
           <span className="text-xs text-gold-100/50 text-center">{weekLabel}</span>
@@ -150,84 +315,18 @@ export function WeeklyMiniCalendar({ appointments, onTabChange }: {
           )}
         </div>
       </div>
-
-      {/* Mobile: 3+3 grid (Mon–Wed / Thu–Sat), Sun hidden */}
+      {/* Mobile: hide Sunday */}
       <div className="grid grid-cols-3 gap-1.5 sm:hidden">
-        {days.filter((d) => d.getDay() !== 0).map((d) => {
-          const dateStr = d.toISOString().slice(0, 10);
-          const isToday = dateStr === todayStr;
-          const dayAppts = appointments.filter((a) => a.date === dateStr && a.status !== "cancelled");
-          const hasPending = dayAppts.some((a) => a.status === "pending");
-          const hasEmergency = dayAppts.some((a) => a.emergency);
-          return (
-            <button key={dateStr} onClick={() => onTabChange("appointments")}
-              className={`rounded-xl p-2 text-center transition-all ${
-                isToday ? "border border-gold-400/60 bg-gold-500/12 shadow-luxe"
-                : "border border-gold-500/15 hover:border-gold-400/40 hover:bg-gold-500/5"
-              }`}>
-              <div className={`text-[10px] uppercase tracking-wider mb-1 ${isToday ? "text-gold-300" : "text-gold-100/40"}`}>
-                {d.toLocaleDateString("en-PH", { weekday: "short" })}
-              </div>
-              <div className={`font-serif text-base leading-none ${isToday ? "text-gold-shine" : "text-gold-100/70"}`}>
-                {d.getDate()}
-              </div>
-              {dayAppts.length > 0 ? (
-                <div className="mt-1 flex justify-center gap-1">
-                  {hasEmergency && <span className="w-1.5 h-1.5 rounded-full bg-red-400" />}
-                  {hasPending   && <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />}
-                  {!hasEmergency && !hasPending && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />}
-                </div>
-              ) : (
-                <div className="text-[9px] text-gold-100/20 mt-1">—</div>
-              )}
-            </button>
-          );
-        })}
+        {days.filter((d) => d.getDay() !== 0).map((d) => (
+          <DayCell key={d.toISOString()} d={d} todayStr={todayStr} appointments={appointments} onTabChange={onTabChange} />
+        ))}
       </div>
-
-      {/* Desktop: full 7-column layout */}
+      {/* Desktop: full 7 columns */}
       <div className="hidden sm:grid grid-cols-7 gap-1.5">
-        {days.map((d) => {
-          const dateStr = d.toISOString().slice(0, 10);
-          const isToday = dateStr === todayStr;
-          const isSunday = d.getDay() === 0;
-          const dayAppts = appointments.filter((a) => a.date === dateStr && a.status !== "cancelled");
-          const hasPending = dayAppts.some((a) => a.status === "pending");
-          const hasEmergency = dayAppts.some((a) => a.emergency);
-          return (
-            <button key={dateStr} onClick={() => !isSunday && onTabChange("appointments")} disabled={isSunday}
-              className={`relative rounded-xl p-2 text-center transition-all ${
-                isToday ? "border border-gold-400/60 bg-gold-500/12 shadow-luxe"
-                : isSunday ? "border border-gold-500/8 opacity-40 cursor-not-allowed"
-                : "border border-gold-500/15 hover:border-gold-400/40 hover:bg-gold-500/5"
-              }`}>
-              <div className={`text-[10px] uppercase tracking-wider mb-1 ${isToday ? "text-gold-300" : "text-gold-100/40"}`}>
-                {d.toLocaleDateString("en-PH", { weekday: "short" })}
-              </div>
-              <div className={`font-serif text-lg leading-none ${isToday ? "text-gold-shine" : "text-gold-100/70"}`}>
-                {d.getDate()}
-              </div>
-              {isSunday ? (
-                <div className="text-[9px] text-gold-100/25 mt-1">Closed</div>
-              ) : dayAppts.length > 0 ? (
-                <div className="mt-1.5 space-y-0.5">
-                  <div className={`text-[10px] font-semibold ${isToday ? "text-gold-300" : "text-gold-100/60"}`}>
-                    {dayAppts.length} appt{dayAppts.length !== 1 ? "s" : ""}
-                  </div>
-                  <div className="flex justify-center gap-1">
-                    {hasEmergency && <span className="w-1.5 h-1.5 rounded-full bg-red-400" />}
-                    {hasPending   && <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />}
-                    {!hasEmergency && !hasPending && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />}
-                  </div>
-                </div>
-              ) : (
-                <div className="text-[9px] text-gold-100/20 mt-1">—</div>
-              )}
-            </button>
-          );
-        })}
+        {days.map((d) => (
+          <DayCell key={d.toISOString()} d={d} todayStr={todayStr} appointments={appointments} onTabChange={onTabChange} />
+        ))}
       </div>
-
       <div className="flex items-center gap-4 mt-2 px-1">
         <span className="flex items-center gap-1.5 text-[10px] text-gold-100/40"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />Confirmed</span>
         <span className="flex items-center gap-1.5 text-[10px] text-gold-100/40"><span className="w-1.5 h-1.5 rounded-full bg-amber-400" />Pending</span>

@@ -13,7 +13,7 @@ import { getRedirectResult } from "firebase/auth";
 import { auth } from "./services/firebase";
 
 // Clear any stale redirect state left over from the old Google Sign-In flow
-getRedirectResult(auth).catch(() => {});
+try { getRedirectResult(auth).catch(() => {}); } catch { /* storage blocked */ }
 
 bootstrapRealtime();
 
@@ -45,7 +45,7 @@ function Root() {
 
   if (!authReady) {
     return (
-      <div className="min-h-screen bg-ink-950 flex items-center justify-center">
+      <div style={{ minHeight: "100vh", background: "#060504", display: "flex", alignItems: "center", justifyContent: "center" }}>
         <div className="flex flex-col items-center gap-4">
           <div className="w-10 h-10 rounded-full border-2 border-gold-400 border-t-transparent animate-spin" />
           <p className="text-xs uppercase tracking-[0.3em] text-gold-300/60">Loading…</p>

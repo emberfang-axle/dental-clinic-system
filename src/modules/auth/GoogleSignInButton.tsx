@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { signInWithPopup, fetchSignInMethodsForEmail } from "firebase/auth";
+import { signInWithPopup, signInWithRedirect } from "firebase/auth";
 import { auth, googleProvider } from "../../services/firebase";
 import { getDocTyped, setDocTyped } from "../../services/firestore";
 import type { User } from "../../shared/types";
@@ -43,7 +43,17 @@ export function GoogleSignInButton({ onSuccess, onError, staffOnly = false, disa
   async function handleClick() {
     setLoading(true);
     try {
-      const result = await signInWithPopup(auth, googleProvider);
+      let result;
+      try {
+        result = await signInWithPopup(auth, googleProvider);
+      } catch (popupErr: any) {
+        // Popup blocked or tracking prevention — fall back to redirect
+        if (popupErr?.code === "auth/popup-blocked" || popupErr?.code === "auth/popup-closed-by-user") {
+          await signInWithRedirect(auth, googleProvider);
+          return; // page will reload; result handled in bootstrap
+        }
+        throw popupErr;
+      }
       const fu = result.user;
 
       let profile = await getDocTyped<User>("users", fu.uid);
@@ -77,18 +87,10 @@ export function GoogleSignInButton({ onSuccess, onError, staffOnly = false, disa
       console.error("[GoogleSignIn] error:", err);
       const code: string = err?.code ?? "";
       if (code === "auth/account-exists-with-different-credential") {
-        // Try to hint which methods are available
         const email = err?.customData?.email as string | undefined;
         if (email) {
-          try {
-            const methods = await fetchSignInMethodsForEmail(auth, email);
-            if (methods.includes("password")) {
-              onError(`An account for ${email} already exists. Please sign in with your email and password instead.`);
-              return;
-            }
-          } catch {
-            // ignore — fall through to generic message
-          }
+          onError(`An account for ${email} already exists. Please sign in with your email and password instead.`);
+          return;
         }
       }
       const msg = mapGoogleError(code, err?.customData?.email);

@@ -22,7 +22,7 @@ export function AuthLayout({ children, navigate }: { children: React.ReactNode; 
 
       <div className="grid lg:grid-cols-2 min-h-screen relative">
         <div className="hidden lg:flex relative overflow-hidden items-end">
-          <img src="/images/doctor-login.png" alt="Estandarte Dental Clinic doctor" className="absolute inset-0 w-full h-full object-cover" />
+          <img src="/images/doctor-login.jpg" alt="Estandarte Dental Clinic doctor" className="absolute inset-0 w-full h-full object-cover" />
           <div className="absolute inset-0 bg-linear-to-t from-ink-950 via-ink-950/40 to-ink-950/30" />
           <div className="absolute inset-0 bg-linear-to-r from-transparent to-ink-950/70" />
           <div className="relative z-10 p-10 xl:p-16 max-w-xl">
@@ -30,9 +30,8 @@ export function AuthLayout({ children, navigate }: { children: React.ReactNode; 
               <span className="h-1.5 w-1.5 rounded-full bg-gold-400" />
               <span className="text-[10px] uppercase tracking-[0.25em] text-gold-200/90 font-semibold">Trusted Dental Care</span>
             </div>
-            <h2 className="font-serif text-4xl xl:text-5xl text-gold-shine leading-tight">
-              Premium dental care, <br />
-              <span className="font-script italic text-gold-200">made simple.</span>
+            <h2 className="font-serif text-2xl xl:text-3xl text-gold-shine leading-tight">
+              Premium dental care, <span className="font-script italic text-gold-200">made simple.</span>
             </h2>
             <p className="mt-5 text-gold-100/70 leading-relaxed">
               Welcome to Estandarte Dental Clinic — where modern systems meet professional care.

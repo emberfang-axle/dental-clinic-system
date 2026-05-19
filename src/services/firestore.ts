@@ -68,9 +68,11 @@ export function listenDoc<T extends DocumentData>(
   id: string,
   cb: (value: WithId<T> | null) => void
 ) {
-  return onSnapshot(doc(db, collectionName, id), (snap) => {
-    cb(snap.exists() ? ({ id: snap.id, ...(snap.data() as T) } as WithId<T>) : null);
-  });
+  return onSnapshot(
+    doc(db, collectionName, id),
+    (snap) => { cb(snap.exists() ? ({ id: snap.id, ...(snap.data() as T) } as WithId<T>) : null); },
+    (_err) => { cb(null); }
+  );
 }
 
 export function listenCollection<T extends DocumentData>(
@@ -81,9 +83,11 @@ export function listenCollection<T extends DocumentData>(
   const q = constraints.length
     ? query(collection(db, collectionName), ...constraints)
     : query(collection(db, collectionName));
-  return onSnapshot(q, (snap) => {
-    cb(snap.docs.map((d) => ({ id: d.id, ...(d.data() as T) })));
-  });
+  return onSnapshot(
+    q,
+    (snap) => { cb(snap.docs.map((d) => ({ id: d.id, ...(d.data() as T) }))); },
+    (_err) => { cb([]); }
+  );
 }
 
 // Convenience query helpers

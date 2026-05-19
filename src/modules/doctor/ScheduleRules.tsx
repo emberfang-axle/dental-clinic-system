@@ -26,6 +26,10 @@ export function ScheduleRules() {
   const [blockedReason, setBlockedReason] = useState("Doctor unavailable");
   const [blockedSlots, setBlockedSlots] = useState(() => calendarService.listBlockedSlots());
 
+  useEffect(() => {
+    calendarService.loadBlockedSlots().then(() => setBlockedSlots(calendarService.listBlockedSlots()));
+  }, []);
+
   useEffect(() => { setForm({ ...DEFAULT_SETTINGS, ...settings }); }, [settings]);
 
   const today = new Date().toISOString().slice(0, 10);
@@ -33,15 +37,15 @@ export function ScheduleRules() {
   const capacity = form.maxAppointmentsPerDay || DEFAULT_SETTINGS.maxAppointmentsPerDay;
   const remaining = Math.max(0, capacity - todayBookings);
 
-  function handleBlock() {
+  async function handleBlock() {
     if (!blockedDate) { setBlockError("Please select a date."); return; }
     setBlockError("");
     if (blockedTime === "all") {
-      BOOKING.TIME_SLOTS.forEach((t) =>
+      await Promise.all(BOOKING.TIME_SLOTS.map((t) =>
         calendarService.blockSlot(blockedDate, t, blockedReason.trim() || "Clinic closed")
-      );
+      ));
     } else {
-      calendarService.blockSlot(blockedDate, blockedTime, blockedReason.trim() || "Doctor unavailable");
+      await calendarService.blockSlot(blockedDate, blockedTime, blockedReason.trim() || "Doctor unavailable");
     }
     setBlockedSlots(calendarService.listBlockedSlots());
   }
@@ -94,7 +98,7 @@ export function ScheduleRules() {
           <Button onClick={async () => { await settingsService.updateClinic(form, user!.name); setSaved(true); setTimeout(() => setSaved(false), 3000); }}>
             Save Rules
           </Button>
-          {saved && <span className="text-sm text-emerald-400">✓ Saved.</span>}
+          {saved && <span className="text-sm text-emerald-400">Saved.</span>}
         </div>
 
         {/* ── Block Time Slot ── */}
@@ -128,7 +132,7 @@ export function ScheduleRules() {
       {/* ── RIGHT: Today overview + blocked slots ── */}
       <div className="space-y-6">
         <Card>
-          <h3 className="font-serif text-2xl text-gold-gradient mb-5">Today's Overview</h3>
+          <h3 className="font-serif text-2xl text-gold-gradient mb-5">Today's Dashboard</h3>
           <div className="grid grid-cols-2 gap-4">
             <div className="rounded-xl border border-gold-500/15 bg-ink-900/40 p-4 text-center">
               <div className="text-3xl font-serif text-gold-gradient">{todayBookings}</div>
@@ -172,7 +176,7 @@ export function ScheduleRules() {
                         <div className="text-sm text-gold-100 font-medium">{date} {isFullDay && <span className="text-[10px] text-amber-300 bg-amber-500/15 border border-amber-500/30 rounded px-1.5 py-0.5 ml-1">All Day</span>}</div>
                         <div className="text-xs text-gold-100/50">{dateSlots[0].reason || "Doctor unavailable"}</div>
                       </div>
-                      <Button variant="danger" size="sm" onClick={() => { calendarService.unblockDate(date); setBlockedSlots(calendarService.listBlockedSlots()); }}>
+                      <Button variant="danger" size="sm" onClick={async () => { await calendarService.unblockDate(date); setBlockedSlots(calendarService.listBlockedSlots()); }}>
                         Unblock Day
                       </Button>
                     </div>
@@ -181,7 +185,7 @@ export function ScheduleRules() {
                         {dateSlots.map((slot) => (
                           <div key={slot.time} className="flex items-center gap-1 text-xs bg-ink-800 border border-gold-500/15 rounded px-2 py-1">
                             <span className="text-gold-100/70">{slot.time}</span>
-                            <button onClick={() => { calendarService.unblockSlot(slot.date, slot.time); setBlockedSlots(calendarService.listBlockedSlots()); }} className="text-red-400/60 hover:text-red-400 ml-1">✕</button>
+                            <button onClick={async () => { await calendarService.unblockSlot(slot.date, slot.time); setBlockedSlots(calendarService.listBlockedSlots()); }} className="text-red-400/60 hover:text-red-400 ml-1">✕</button>
                           </div>
                         ))}
                       </div>

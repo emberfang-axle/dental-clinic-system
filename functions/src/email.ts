@@ -1,236 +1,162 @@
-import {onDocumentCreated, onDocumentUpdated} from "firebase-functions/v2/firestore";
-import {onSchedule} from "firebase-functions/v2/scheduler";
-import * as admin from "firebase-admin";
-import * as logger from "firebase-functions/logger";
-import {Resend} from "resend";
+import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { defineSecret } from "firebase-functions/params";
+import * as nodemailer from "nodemailer";
 
-const FROM = "Estandarte Dental <noreply@estandartedental.com>";
-const CLINIC_EMAIL = "drkingestandarte2022@gmail.com";
+const GMAIL_FROM = defineSecret("GMAIL_FROM");
+const GMAIL_CLIENT_ID = defineSecret("GMAIL_CLIENT_ID");
+const GMAIL_CLIENT_SECRET = defineSecret("GMAIL_CLIENT_SECRET");
+const GMAIL_REFRESH_TOKEN = defineSecret("GMAIL_REFRESH_TOKEN");
 
-function getResend(): Resend {
-  const key = process.env.RESEND_API_KEY;
-  if (!key) throw new Error("RESEND_API_KEY not set");
-  return new Resend(key);
+function makeTransport() {
+  return nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      type: "OAuth2",
+      user: GMAIL_FROM.value(),
+      clientId: GMAIL_CLIENT_ID.value(),
+      clientSecret: GMAIL_CLIENT_SECRET.value(),
+      refreshToken: GMAIL_REFRESH_TOKEN.value(),
+    },
+  } as any);
 }
 
-async function sendEmail(to: string, subject: string, html: string): Promise<void> {
+export type EmailPayload =
+  | { type: "booking";       patientEmail: string; patientName: string; serviceName: string; date: string; time: string; doctor: string }
+  | { type: "confirmed";     patientEmail: string; patientName: string; serviceName: string; date: string; time: string }
+  | { type: "completed";     patientEmail: string; patientName: string; serviceName: string }
+  | { type: "cancelled";     patientEmail: string; patientName: string; serviceName: string; date: string; time: string }
+  | { type: "rescheduled";   patientEmail: string; patientName: string; serviceName: string; date: string; time: string }
+  | { type: "payment";       patientEmail: string; patientName: string; serviceName: string; price: number; receiptNumber?: string }
+  | { type: "reminder";      patientEmail: string; patientName: string; serviceName: string; date: string; time: string; doctor?: string }
+  | { type: "followup";      patientEmail: string; patientName: string; serviceName: string }
+  | { type: "announcement";  toEmail: string; title: string; body: string };
+
+function buildEmail(p: EmailPayload): { subject: string; html: string } {
+  const clinic = "Estandarte Dental Clinic";
+  const wrap = (subject: string, body: string) => ({
+    subject,
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#fff;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden">
+        <div style="background:#0b0a08;padding:24px;text-align:center">
+          <h1 style="color:#dab23c;margin:0;font-size:22px">${clinic}</h1>
+        </div>
+        <div style="padding:32px">
+          ${body}
+          <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0"/>
+          <p style="color:#6b7280;font-size:12px;margin:0">This is an automated message from ${clinic}. Please do not reply to this email.</p>
+        </div>
+      </div>`,
+  });
+
+  switch (p.type) {
+    case "booking":
+      return wrap(`Appointment Request Received — ${p.serviceName}`, `
+        <p>Hi <strong>${p.patientName}</strong>,</p>
+        <p>We received your appointment request. Here are the details:</p>
+        <table style="width:100%;border-collapse:collapse;margin:16px 0">
+          <tr><td style="padding:8px;color:#6b7280;width:40%">Service</td><td style="padding:8px"><strong>${p.serviceName}</strong></td></tr>
+          <tr style="background:#f9fafb"><td style="padding:8px;color:#6b7280">Date</td><td style="padding:8px"><strong>${p.date}</strong></td></tr>
+          <tr><td style="padding:8px;color:#6b7280">Time</td><td style="padding:8px"><strong>${p.time}</strong></td></tr>
+          <tr style="background:#f9fafb"><td style="padding:8px;color:#6b7280">Doctor</td><td style="padding:8px"><strong>${p.doctor}</strong></td></tr>
+        </table>
+        <p>Your appointment is <strong>pending confirmation</strong>. We will notify you once it is confirmed.</p>
+        <p>Please arrive <strong>10 minutes early</strong> on the day of your appointment.</p>`);
+
+    case "confirmed":
+      return wrap(`Appointment Confirmed ✓ — ${p.serviceName}`, `
+        <p>Hi <strong>${p.patientName}</strong>,</p>
+        <p>Your appointment has been <strong style="color:#16a34a">confirmed</strong>!</p>
+        <table style="width:100%;border-collapse:collapse;margin:16px 0">
+          <tr><td style="padding:8px;color:#6b7280;width:40%">Service</td><td style="padding:8px"><strong>${p.serviceName}</strong></td></tr>
+          <tr style="background:#f9fafb"><td style="padding:8px;color:#6b7280">Date</td><td style="padding:8px"><strong>${p.date}</strong></td></tr>
+          <tr><td style="padding:8px;color:#6b7280">Time</td><td style="padding:8px"><strong>${p.time}</strong></td></tr>
+        </table>
+        <p>Please arrive <strong>10 minutes early</strong>. See you soon!</p>`);
+
+    case "completed":
+      return wrap(`Thank You for Your Visit — ${p.serviceName}`, `
+        <p>Hi <strong>${p.patientName}</strong>,</p>
+        <p>Your <strong>${p.serviceName}</strong> appointment has been completed.</p>
+        <p>Thank you for choosing ${clinic}! We hope to see you again soon.</p>`);
+
+    case "cancelled":
+      return wrap(`Appointment Cancelled — ${p.serviceName}`, `
+        <p>Hi <strong>${p.patientName}</strong>,</p>
+        <p>Your appointment has been <strong style="color:#dc2626">cancelled</strong>.</p>
+        <table style="width:100%;border-collapse:collapse;margin:16px 0">
+          <tr><td style="padding:8px;color:#6b7280;width:40%">Service</td><td style="padding:8px"><strong>${p.serviceName}</strong></td></tr>
+          <tr style="background:#f9fafb"><td style="padding:8px;color:#6b7280">Date</td><td style="padding:8px"><strong>${p.date}</strong></td></tr>
+          <tr><td style="padding:8px;color:#6b7280">Time</td><td style="padding:8px"><strong>${p.time}</strong></td></tr>
+        </table>
+        <p>To rebook, please visit our website or contact the clinic.</p>`);
+
+    case "rescheduled":
+      return wrap(`Appointment Rescheduled — ${p.serviceName}`, `
+        <p>Hi <strong>${p.patientName}</strong>,</p>
+        <p>Your appointment has been <strong>rescheduled</strong>.</p>
+        <table style="width:100%;border-collapse:collapse;margin:16px 0">
+          <tr><td style="padding:8px;color:#6b7280;width:40%">Service</td><td style="padding:8px"><strong>${p.serviceName}</strong></td></tr>
+          <tr style="background:#f9fafb"><td style="padding:8px;color:#6b7280">New Date</td><td style="padding:8px"><strong>${p.date}</strong></td></tr>
+          <tr><td style="padding:8px;color:#6b7280">New Time</td><td style="padding:8px"><strong>${p.time}</strong></td></tr>
+        </table>
+        <p>Please arrive <strong>10 minutes early</strong>.</p>`);
+
+    case "payment":
+      return wrap(`Payment Confirmed — ${p.serviceName}`, `
+        <p>Hi <strong>${p.patientName}</strong>,</p>
+        <p>Your payment has been <strong style="color:#16a34a">confirmed</strong>.</p>
+        <table style="width:100%;border-collapse:collapse;margin:16px 0">
+          <tr><td style="padding:8px;color:#6b7280;width:40%">Service</td><td style="padding:8px"><strong>${p.serviceName}</strong></td></tr>
+          <tr style="background:#f9fafb"><td style="padding:8px;color:#6b7280">Amount</td><td style="padding:8px"><strong>PHP ${p.price.toLocaleString()}</strong></td></tr>
+          ${p.receiptNumber ? `<tr><td style="padding:8px;color:#6b7280">Receipt No.</td><td style="padding:8px"><strong>${p.receiptNumber}</strong></td></tr>` : ""}
+        </table>
+        <p>Thank you for your payment!</p>`);
+
+    case "reminder":
+      return wrap(`Appointment Reminder — Tomorrow: ${p.serviceName}`, `
+        <p>Hi <strong>${p.patientName}</strong>,</p>
+        <p>This is a reminder that you have an appointment <strong>tomorrow</strong>.</p>
+        <table style="width:100%;border-collapse:collapse;margin:16px 0">
+          <tr><td style="padding:8px;color:#6b7280;width:40%">Service</td><td style="padding:8px"><strong>${p.serviceName}</strong></td></tr>
+          <tr style="background:#f9fafb"><td style="padding:8px;color:#6b7280">Date</td><td style="padding:8px"><strong>${p.date}</strong></td></tr>
+          <tr><td style="padding:8px;color:#6b7280">Time</td><td style="padding:8px"><strong>${p.time}</strong></td></tr>
+          ${p.doctor ? `<tr style="background:#f9fafb"><td style="padding:8px;color:#6b7280">Doctor</td><td style="padding:8px"><strong>${p.doctor}</strong></td></tr>` : ""}
+        </table>
+        <p>Please arrive <strong>10 minutes early</strong>.</p>`);
+
+    case "followup":
+      return wrap(`How Was Your Visit? — ${p.serviceName}`, `
+        <p>Hi <strong>${p.patientName}</strong>,</p>
+        <p>We hope your <strong>${p.serviceName}</strong> appointment went well!</p>
+        <p>Your feedback helps us improve our service. Please log in to our website to leave a review.</p>`);
+
+    case "announcement":
+      return wrap(p.title, `
+        <p><strong>${p.title}</strong></p>
+        <p>${p.body.replace(/\n/g, "<br/>")}</p>`);
+  }
+}
+
+export const sendEmail = onCall({ secrets: [GMAIL_FROM, GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN] }, async (request) => {
+  const payload = request.data as EmailPayload;
+  if (!payload?.type) throw new HttpsError("invalid-argument", "Missing email type.");
+
+  const to = "patientEmail" in payload ? payload.patientEmail : (payload as any).toEmail;
+  if (!to) throw new HttpsError("invalid-argument", "Missing recipient email.");
+
+  const { subject, html } = buildEmail(payload);
+  const transport = makeTransport();
+
   try {
-    const resend = getResend();
-    const {error} = await resend.emails.send({from: FROM, to: [to], subject, html});
-    if (error) logger.error("Resend error", error);
-  } catch (err) {
-    logger.warn("Email skipped:", err);
+    await transport.sendMail({
+      from: `"Estandarte Dental Clinic" <${GMAIL_FROM.value()}>`,
+      to,
+      subject,
+      html,
+    });
+    return { success: true };
+  } catch (err: any) {
+    console.error("sendEmail error:", err);
+    throw new HttpsError("internal", "Failed to send email.");
   }
-}
-
-function clinicSignature(): string {
-  return `<p style="margin-top:24px;color:#888;font-size:13px;">— Estandarte Dental Clinic<br>
-    <a href="https://estandartedental.com" style="color:#b8860b;">estandartedental.com</a></p>`;
-}
-
-/**
- * New appointment created → confirmation email to patient + alert to clinic.
- */
-export const appointmentBookedEmail = onDocumentCreated(
-  {document: "appointments/{id}", secrets: ["RESEND_API_KEY"]},
-  async (event) => {
-    const data = event.data?.data();
-    if (!data?.patientEmail) return;
-
-    await Promise.all([
-      // Patient confirmation
-      sendEmail(
-        data.patientEmail,
-        "Appointment Request Received — Estandarte Dental",
-        `<p>Hi <strong>${data.patientName}</strong>,</p>
-         <p>We've received your appointment request for <strong>${data.serviceName}</strong> on
-         <strong>${data.date}</strong> at <strong>${data.time}</strong> with <strong>${data.doctor}</strong>.</p>
-         <p>Your appointment is currently <strong>pending confirmation</strong>. We'll email you once it's confirmed.</p>
-         <p>Please arrive 10 minutes early on the day of your appointment.</p>
-         ${clinicSignature()}`
-      ),
-      // Clinic alert
-      sendEmail(
-        CLINIC_EMAIL,
-        `${data.emergency ? "🚨 EMERGENCY — " : ""}New Booking: ${data.patientName} — ${data.serviceName}`,
-        `<p>A new appointment has been booked${data.emergency ? " <strong style='color:red'>EMERGENCY</strong>" : ""}:</p>
-         <ul>
-           <li><strong>Patient:</strong> ${data.patientName} (${data.patientEmail})</li>
-           <li><strong>Service:</strong> ${data.serviceName}</li>
-           <li><strong>Doctor:</strong> ${data.doctor}</li>
-           <li><strong>Date &amp; Time:</strong> ${data.date} at ${data.time}</li>
-           ${data.emergency ? "<li><strong style='color:red'>⚠ Marked as EMERGENCY — priority handling required.</strong></li>" : ""}
-         </ul>
-         <p>Please confirm or manage this appointment in the admin dashboard.</p>
-         ${clinicSignature()}`
-      ),
-    ]);
-  }
-);
-
-/**
- * Appointment updated → status/payment emails to patient.
- */
-export const appointmentEmail = onDocumentUpdated(
-  {document: "appointments/{id}", secrets: ["RESEND_API_KEY"]},
-  async (event) => {
-    const before = event.data?.before.data();
-    const after = event.data?.after.data();
-    if (!before || !after || !after.patientEmail) return;
-
-    const email: string = after.patientEmail;
-
-    if (before.status !== "confirmed" && after.status === "confirmed") {
-      await sendEmail(email,
-        "Your Appointment is Confirmed — Estandarte Dental",
-        `<p>Hi <strong>${after.patientName}</strong>,</p>
-         <p>Your <strong>${after.serviceName}</strong> appointment on <strong>${after.date}</strong>
-         at <strong>${after.time}</strong> is confirmed.</p>
-         <p>Please arrive 10 minutes early. See you soon!</p>
-         ${clinicSignature()}`
-      );
-    }
-
-    if (before.status !== "completed" && after.status === "completed") {
-      await sendEmail(email,
-        "Appointment Completed — Thank You! — Estandarte Dental",
-        `<p>Hi <strong>${after.patientName}</strong>,</p>
-         <p>Your <strong>${after.serviceName}</strong> appointment has been completed.
-         Thank you for visiting Estandarte Dental Clinic!</p>
-         <p>We hope to see you again soon.</p>
-         ${clinicSignature()}`
-      );
-    }
-
-    if (before.paymentStatus !== "paid" && after.paymentStatus === "paid") {
-      await sendEmail(email,
-        `Payment Confirmed — ${after.receiptNumber ?? "Receipt"} — Estandarte Dental`,
-        `<p>Hi <strong>${after.patientName}</strong>,</p>
-         <p>Your payment of <strong>PHP ${after.price?.toLocaleString()}</strong> for
-         <strong>${after.serviceName}</strong> has been confirmed.</p>
-         <p>Receipt No: <strong>${after.receiptNumber ?? "—"}</strong></p>
-         <p>Thank you for choosing Estandarte Dental Clinic!</p>
-         ${clinicSignature()}`
-      );
-    }
-
-    if (before.status !== "cancelled" && after.status === "cancelled") {
-      await Promise.all([
-        sendEmail(email,
-          "Appointment Cancelled — Estandarte Dental",
-          `<p>Hi <strong>${after.patientName}</strong>,</p>
-           <p>Your <strong>${after.serviceName}</strong> appointment on <strong>${after.date}</strong>
-           at <strong>${after.time}</strong> has been cancelled.</p>
-           <p>If you'd like to rebook, please visit our website or contact the clinic.</p>
-           ${clinicSignature()}`
-        ),
-        sendEmail(CLINIC_EMAIL,
-          `Appointment Cancelled: ${after.patientName} — ${after.date} at ${after.time}`,
-          `<p>An appointment has been <strong>cancelled</strong>:</p>
-           <ul>
-             <li><strong>Patient:</strong> ${after.patientName}</li>
-             <li><strong>Service:</strong> ${after.serviceName}</li>
-             <li><strong>Doctor:</strong> ${after.doctor}</li>
-             <li><strong>Date & Time:</strong> ${after.date} at ${after.time}</li>
-           </ul>
-           <p>This slot is now available for rebooking.</p>
-           ${clinicSignature()}`
-        ),
-      ]);
-    }
-
-    if (before.status !== "rescheduled" && after.status === "rescheduled") {
-      await sendEmail(email,
-        "Appointment Rescheduled — Estandarte Dental",
-        `<p>Hi <strong>${after.patientName}</strong>,</p>
-         <p>Your <strong>${after.serviceName}</strong> appointment has been rescheduled to
-         <strong>${after.date}</strong> at <strong>${after.time}</strong>.</p>
-         <p>Please arrive 10 minutes early. See you soon!</p>
-         ${clinicSignature()}`
-      );
-    }
-  }
-);
-
-/**
- * Daily 8 AM PH time — 24-hour reminder to patients with appointments tomorrow.
- */
-export const appointmentReminderEmail = onSchedule(
-  {schedule: "0 0 * * *", timeZone: "Asia/Manila", secrets: ["RESEND_API_KEY"]},
-  async () => {
-    const db = admin.firestore();
-    const now = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Manila"}));
-    const tomorrow = new Date(now);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowStr = tomorrow.toISOString().slice(0, 10);
-
-    const snap = await db.collection("appointments")
-      .where("date", "==", tomorrowStr)
-      .where("status", "in", ["confirmed", "pending"])
-      .get();
-
-    if (snap.empty) {
-      logger.info(`No appointments tomorrow (${tomorrowStr})`);
-      return;
-    }
-
-    await Promise.all(snap.docs.map(async (docSnap) => {
-      const appt = docSnap.data();
-      if (!appt.patientEmail) return;
-      await sendEmail(
-        appt.patientEmail,
-        "⏰ Appointment Reminder — Tomorrow at Estandarte Dental",
-        `<p>Hi <strong>${appt.patientName}</strong>,</p>
-         <p>This is a friendly reminder that you have a <strong>${appt.serviceName}</strong> appointment
-         <strong>tomorrow, ${appt.date}</strong> at <strong>${appt.time}</strong>
-         with <strong>${appt.doctor}</strong>.</p>
-         <p>Please arrive <strong>10 minutes early</strong>. If you need to reschedule or cancel,
-         please do so as soon as possible.</p>
-         <p>See you tomorrow!</p>
-         ${clinicSignature()}`
-      );
-    }));
-
-    logger.info(`Sent ${snap.size} reminder email(s) for ${tomorrowStr}`);
-  }
-);
-
-/**
- * New announcement created → email all patients AND staff/doctors.
- */
-export const announcementEmail = onDocumentCreated(
-  {document: "announcements/{id}", secrets: ["RESEND_API_KEY"]},
-  async (event) => {
-    const data = event.data?.data();
-    if (!data) return;
-
-    const db = admin.firestore();
-    const usersSnap = await db.collection("users")
-      .where("role", "in", ["patient", "staff", "doctor", "co-doctor", "admin"])
-      .get();
-
-    if (usersSnap.empty) return;
-
-    const emails = usersSnap.docs
-      .map((d) => d.data().email as string | undefined)
-      .filter((e): e is string => !!e)
-      .map((to) => ({
-        from: FROM,
-        to: [to],
-        subject: `📢 ${data.title} — Estandarte Dental`,
-        html: `<p>${data.body}</p>${clinicSignature()}`,
-      }));
-
-    if (emails.length === 0) return;
-
-    try {
-      const resend = getResend();
-      const {error} = await resend.batch.send(emails);
-      if (error) logger.error("Resend batch error", error);
-    } catch (err) {
-      logger.warn("Batch email skipped:", err);
-    }
-
-    logger.info(`Announcement "${data.title}" emailed to ${emails.length} users`);
-  }
-);
+});

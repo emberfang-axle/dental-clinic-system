@@ -10,6 +10,7 @@ import { Badge, Button, Input, Label } from "../../components/ui";
 import { appointmentsService } from "../../services/appointments";
 import { calendarService } from "../../services/calendar";
 import { waitlistService } from "../../services/waitlist";
+import { KNOWN_DOCTOR_NAMES } from "../../services/bootstrap";
 import { useStore } from "../../store/store";
 import { BOOKING, ROUTES } from "../../shared/constants";
 import { dashboardPathFor } from "../../shared/helpers";
@@ -23,20 +24,20 @@ const SERVICE_CATEGORIES = [
 ];
 
 export function BookAppointmentPage({ navigate }: { navigate: (p: string) => void }) {
-  const { user, services: rawServices, appointments, users, doctorSchedules } = useStore();
+  const { user, services: rawServices, appointments, users, doctorSchedules, settings } = useStore();
   const services = rawServices.filter(
     (s, i, arr) => arr.findIndex((x) => x.name.toLowerCase() === s.name.toLowerCase()) === i
   );
 
-  // Active doctors from Firestore users only
+  // Active doctors from Firestore users only — exclude stale/unknown entries
   const doctorOptions = users
-    .filter((u) => (u.role === "doctor" || u.role === "co-doctor") && u.active !== false)
+    .filter((u) => (u.role === "doctor" || u.role === "co-doctor") && u.active !== false && KNOWN_DOCTOR_NAMES.has(u.name))
     .map((d) => ({ name: d.name, sub: "Licensed Dentist" }))
     .filter((d, i, arr) => arr.findIndex((x) => x.name === d.name) === i);
 
   const [step, setStep] = useState(1);
-  const [serviceId, setServiceId] = useState(services[0]?.id ?? "");
-  const [doctor, setDoctor] = useState(doctorOptions[0]?.name ?? "");
+  const [serviceId, setServiceId] = useState(() => services[0]?.id ?? "");
+  const [doctor, setDoctor] = useState(() => doctorOptions[0]?.name ?? "");
   const [date, setDate] = useState(() => {
     const d = new Date(); d.setDate(d.getDate() + 1);
     return d.toISOString().slice(0, 10);
@@ -48,11 +49,7 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
   const [bookingError, setBookingError] = useState("");
   const [booking, setBooking] = useState(false);
 
-  const service = services.find((s) => s.id === serviceId);
-  if (!service && services.length > 0) {
-    setServiceId(services[0].id);
-    return null;
-  }
+  const service = services.find((s) => s.id === serviceId) ?? services[0];
   if (!service) return null;
 
   if (!user) {
@@ -94,6 +91,12 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
       if (date < today) { setBookingError("Please select a future date."); return; }
       if (new Date(date + "T00:00:00").getDay() === 0) { setBookingError("The clinic is closed on Sundays. Please pick another day."); return; }
       if (patientConflict) { setBookingError(`You already have an appointment on ${date} at ${time}. Please choose a different time.`); return; }
+      const maxPerDay = settings?.maxAppointmentsPerDay ?? 7;
+      const bookedOnDate = appointments.filter((a) => a.date === date && a.status !== "cancelled").length;
+      if (bookedOnDate >= maxPerDay) {
+        setBookingError(`This date is fully booked (${maxPerDay} appointments). Please choose another date.`);
+        return;
+      }
     }
     setStep((s) => Math.min(s + 1, 4));
   }
@@ -140,7 +143,9 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
     return (
       <Centered navigate={navigate}>
         <div className="max-w-lg w-full glass-strong rounded-2xl p-10 text-center shadow-luxe fade-up">
-          <div className="w-20 h-20 mx-auto rounded-full bg-gradient-to-br from-emerald-500/30 to-emerald-700/10 border border-emerald-400/40 flex items-center justify-center text-emerald-300 text-4xl mb-6 pulse-gold">✓</div>
+          <div className="w-20 h-20 mx-auto rounded-full bg-gradient-to-br from-emerald-500/30 to-emerald-700/10 border border-emerald-400/40 flex items-center justify-center mb-6">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#34d399" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          </div>
           <p className="text-[10px] uppercase tracking-[0.4em] text-gold-400 font-semibold mb-3">Confirmed</p>
           <h2 className="font-serif text-4xl text-gold-shine font-light">
             Appointment <span className="font-script italic">Booked!</span>
@@ -155,7 +160,7 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
           {/* Deposit guidance for deposit-required services */}
           {depositAmount && (
             <div className="mt-6 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-left space-y-2">
-              <p className="text-sm font-semibold text-amber-300">⚠ Deposit Required to Confirm</p>
+              <p className="text-sm font-semibold text-amber-300">Deposit Required to Confirm</p>
               <p className="text-xs text-amber-200/80 leading-relaxed">
                 This service requires a minimum <span className="font-semibold text-amber-300">30% deposit (₱{depositAmount.toLocaleString()})</span> to secure your slot.
               </p>
@@ -211,7 +216,7 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
                   : active ? "bg-gold-500/20 text-gold-200 border-gold-400"
                   : "border-gold-500/20 text-gold-100/30"
                 }`}>
-                  {step > i + 1 ? "✓" : i + 1}
+                  {step > i + 1 ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg> : i + 1}
                 </div>
                 <div className={`ml-2 text-[10px] uppercase tracking-wider hidden sm:block font-semibold ${active ? "text-gold-200" : "text-gold-100/30"}`}>{label}</div>
                 {i < 3 && <div className={`flex-1 h-px mx-3 transition-all ${step > i + 1 ? "bg-gold-400" : "bg-gold-500/15"}`} />}
@@ -258,7 +263,7 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
                                 </div>
                               )}
                               {serviceId === s.id && (
-                                <div className="mt-2 text-[10px] text-gold-400 font-semibold">✓ Selected — tap again to continue →</div>
+                                <div className="mt-2 text-[10px] text-gold-400 font-semibold">Selected — tap again to continue</div>
                               )}
                             </button>
                           ))}

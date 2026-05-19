@@ -1,10 +1,29 @@
-﻿import { onAuthStateChanged } from "firebase/auth";
+import { onAuthStateChanged } from "firebase/auth";
 import type { ClinicSettings, DoctorSchedule, StaffPermission, User, Appointment, NotificationEntry, FeedbackEntry, Service, AuditLog, WaitlistEntry } from "../shared/types";
 import { auth } from "./firebase";
 import { listenCollection, listenDoc, listCollection, setDocTyped, deleteDocTyped, qOrderBy, qWhere } from "./firestore";
 import { resetState, setState, getSnapshot, showToast } from "../store/store";
 import { scheduleAlertsService } from "./scheduleAlerts";
-import { reminderService } from "./reminderService";
+import { calendarService } from "./calendar";
+
+export const KNOWN_DOCTOR_NAMES = new Set([
+  "Dr. Mary Cris Estandarte",
+  "Dr. Kim Precioso",
+  "Dr. Mary Ann Ransas",
+]);
+
+async function purgeStaleDoctor() {
+  try {
+    const all = await listCollection<User>("users");
+    for (const u of all) {
+      if ((u.role === "doctor" || u.role === "co-doctor") && !KNOWN_DOCTOR_NAMES.has(u.name)) {
+        await deleteDocTyped("users", u.id);
+      }
+    }
+  } catch {
+    // Silently skip — may fail if unauthenticated or rules block access
+  }
+}
 
 const DEFAULT_SERVICES: Omit<Service, "id">[] = [
   { name: "Oral Consultation",               price: 300,   duration: 20, description: "Initial check-up and dental assessment by the doctor." },
@@ -74,6 +93,14 @@ export function bootstrapRealtime() {
   };
 
   seedServices();
+  calendarService.loadBlockedSlots().catch(() => {});
+
+  // Safety timeout: if onAuthStateChanged never fires (network/config issue), unblock the UI
+  const authTimeout = setTimeout(() => {
+    if (!getSnapshot().authReady) {
+      setState({ authReady: true, profileReady: true, user: null });
+    }
+  }, 6000);
 
   // Public listeners — always active, never torn down on auth change
   const publicUnsubs: (() => void)[] = [];
@@ -90,6 +117,7 @@ export function bootstrapRealtime() {
   );
 
   const unsubAuth = onAuthStateChanged(auth, (firebaseUser) => {
+    clearTimeout(authTimeout);
     stopAll();
     // Preserve public data that's managed by always-on listeners
     const { services, feedbacks, announcements, waitlist, doctorSchedules } = getSnapshot();
@@ -112,12 +140,12 @@ export function bootstrapRealtime() {
       return;
     }
 
-    // Safety timeout: if Firestore doesn't respond in 8s, unblock the UI
+    // Safety timeout: if Firestore doesn't respond in 4s, unblock the UI
     const profileTimeout = setTimeout(() => {
       if (!getSnapshot().profileReady) {
         setState({ profileReady: true });
       }
-    }, 8000);
+    }, 4000);
 
     let welcomeShown = false;
 
@@ -134,9 +162,12 @@ export function bootstrapRealtime() {
             profile.name;
           setTimeout(() => showToast(`Welcome back, ${label}!`, "success", 3500), 500);
         }
+        // Only doctors/admins can write to users collection — purge stale docs on their login
+        if (profile.role === "doctor" || profile.role === "admin") {
+          purgeStaleDoctor();
+        }
         setTimeout(() => {
           scheduleAlertsService.runForUser(profile);
-          reminderService.run(getSnapshot().appointments);
         }, 3000);
       }
     });

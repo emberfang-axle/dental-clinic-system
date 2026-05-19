@@ -366,3 +366,43 @@ input[type=number]::-webkit-outer-spin-button {
 input[type="date"] {
   color-scheme: dark;
 }
+
+/* Scroll mouse indicator */
+.scroll-mouse {
+  width: 22px;
+  height: 34px;
+  border: 1.5px solid rgba(218, 178, 60, 0.4);
+  border-radius: 12px;
+  position: relative;
+  flex-shrink: 0;
+}
+.scroll-mouse::before {
+  content: '';
+  position: absolute;
+  top: 5px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 3px;
+  height: 7px;
+  background: rgba(218, 178, 60, 0.7);
+  border-radius: 2px;
+  animation: scroll-dot 1.8s ease-in-out infinite;
+}
+@keyframes scroll-dot {
+  0%, 100% { opacity: 1; transform: translateX(-50%) translateY(0); }
+  50% { opacity: 0.3; transform: translateX(-50%) translateY(10px); }
+}
+
+/* Testimonial marquee */
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.testimonial-marquee {
+  animation: marquee 40s linear infinite;
+  width: max-content;
+  padding: 0 1.25rem;
+}
+.testimonial-marquee:hover {
+  animation-play-state: paused;
+}

@@ -10,6 +10,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@emailjs/browser": "4.4.1",
     "@types/firebase": "^2.4.32",
     "clsx": "^2.1.1",
     "firebase": "^12.12.1",

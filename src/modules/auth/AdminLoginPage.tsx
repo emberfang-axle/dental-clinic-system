@@ -33,6 +33,12 @@ export function AdminLoginPage({ navigate }: { navigate: (p: string) => void }) 
         setLoading(false);
         return;
       }
+      if (u.active === false) {
+        await authService.logout();
+        setError("This account has been removed. Please contact the administrator.");
+        setLoading(false);
+        return;
+      }
       if (u.role === "patient") {
         setError("Patients must use the Patient Login.");
         setLoading(false);

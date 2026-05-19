@@ -2,14 +2,16 @@ import { Badge, Button, Card } from "../../components/ui";
 import { useStore } from "../../store/store";
 import { downloadInvoice, downloadTreatmentNotes } from "../../utils/invoice";
 import { ImagePreview, RecordBlock } from "../shared/SharedModules";
+import { formatDateTime } from "../../shared/helpers";
 import { ROUTES } from "../../shared/constants";
 
 export function PatientTreatmentRecords({ navigate }: { navigate?: (p: string) => void }) {
   const { appointments, user } = useStore();
+  if (!user) return null;
 
   // All non-cancelled appointments for timeline
   const allMine = appointments
-    .filter((a) => a.patientId === user!.id && a.status !== "cancelled")
+    .filter((a) => a.patientId === user.id && a.status !== "cancelled")
     .sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
 
   // Only completed ones with clinical data for records
@@ -90,16 +92,43 @@ export function PatientTreatmentRecords({ navigate }: { navigate?: (p: string) =
                     )}
                   </div>
                 </div>
-                <div className="mt-5 grid md:grid-cols-2 gap-4">
-                  <RecordBlock title="Diagnosis" value={a.diagnosis || "Not yet recorded"} />
-                  <RecordBlock title="Treatment Plan" value={a.treatmentPlan || "Not yet recorded"} />
-                  <RecordBlock title="Dental History" value={a.dentalHistory || "Not yet recorded"} />
-                  <RecordBlock title="Doctor Notes" value={a.notes || "No note added yet"} />
+
+                {/* Progress Notes section */}
+                <div className="mt-5">
+                  <div className="text-[10px] uppercase tracking-[0.22em] text-gold-300/55 mb-3 flex items-center gap-2">
+                    <span>Progress Notes</span>
+                    {a.progressNoteAt && (
+                      <span className="text-gold-100/30 normal-case tracking-normal">
+                        · Recorded by {a.progressNoteBy ?? "Doctor"} on {formatDateTime(a.progressNoteAt)}
+                      </span>
+                    )}
+                  </div>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <RecordBlock title="Chief Complaint"     value={a.complaint    || "Not recorded"} />
+                    <RecordBlock title="Diagnosis"           value={a.diagnosis    || "Not yet recorded"} />
+                    <RecordBlock title="Treatment Performed" value={a.treatmentPlan || "Not yet recorded"} />
+                    <RecordBlock title="Prescription"        value={a.prescription || "None"} />
+                    <RecordBlock title="Follow-up Schedule"  value={a.followUpDate || "None scheduled"} />
+                    <RecordBlock title="Doctor Notes"        value={a.notes        || "No note added yet"} />
+                  </div>
                 </div>
+
+                {/* Dental History section */}
+                {a.dentalHistory && (
+                  <div className="mt-5">
+                    <div className="text-[10px] uppercase tracking-[0.22em] text-gold-300/55 mb-3">Dental History</div>
+                    <RecordBlock title="Dental History" value={a.dentalHistory} />
+                  </div>
+                )}
+
+                {/* Before / After photos */}
                 {(a.beforeImageUrl || a.afterImageUrl) && (
-                  <div className="mt-5 grid md:grid-cols-2 gap-4">
-                    <ImagePreview title="Before Treatment" src={a.beforeImageUrl} />
-                    <ImagePreview title="After Treatment" src={a.afterImageUrl} />
+                  <div className="mt-5">
+                    <div className="text-[10px] uppercase tracking-[0.22em] text-gold-300/55 mb-3">Before & After</div>
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <ImagePreview title="Before Treatment" src={a.beforeImageUrl} />
+                      <ImagePreview title="After Treatment"  src={a.afterImageUrl} />
+                    </div>
                   </div>
                 )}
               </Card>

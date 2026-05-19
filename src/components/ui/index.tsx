@@ -246,17 +246,15 @@ export function Ornament({ className }: { className?: string }) {
 export function StatCard({
   label,
   value,
-  icon,
   sub,
 }: {
   label: string;
   value: ReactNode;
-  icon: string;
+  icon?: string; // kept for API compat, no longer rendered
   sub?: string;
 }) {
   return (
     <Card className="!p-5">
-      <div className="text-2xl mb-1">{icon}</div>
       <div className="text-[11px] uppercase tracking-[0.2em] text-gold-100/50">{label}</div>
       <div className="text-2xl font-serif text-gold-gradient mt-1">{value}</div>
       {sub && <div className="text-[10px] text-gold-100/40 mt-1">{sub}</div>}
@@ -306,10 +304,10 @@ export function ConfirmDialog({
 }
 
 /** Empty state placeholder */
-export function EmptyState({ icon = "📭", title, subtitle }: { icon?: string; title: string; subtitle?: string }) {
+export function EmptyState({ icon = "—", title, subtitle }: { icon?: string; title: string; subtitle?: string }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
-      <div className="text-4xl mb-3">{icon}</div>
+      <div className="text-2xl text-gold-300/30 mb-3 font-serif">{icon}</div>
       <p className="text-gold-100/60 font-medium">{title}</p>
       {subtitle && <p className="text-xs text-gold-100/40 mt-1">{subtitle}</p>}
     </div>

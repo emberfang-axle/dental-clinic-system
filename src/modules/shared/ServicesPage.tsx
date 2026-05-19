@@ -40,7 +40,7 @@ export function ServicesPage({ role }: { role: Role }) {
   if (other.length > 0) categorised.push({ label: "Other", items: other });
 
   const handlePriceChange = useCallback((serviceId: string, newPrice: number) => {
-    if (canEdit && user) catalogService.setPrice(serviceId, newPrice);
+    if (canEdit && user) catalogService.update(serviceId, { price: newPrice });
   }, [canEdit, user]);
 
   return (

@@ -118,7 +118,7 @@ export function AppointmentsList({ role, patientOnly }: { role: Role | "admin"; 
       {paged.length === 0 && (
         <Card>
           <EmptyState
-            icon="📋"
+            icon="—"
             title="No appointments found"
             subtitle={search || filter !== "all" ? "Try adjusting your search or filter." : "No appointments have been booked yet."}
           />

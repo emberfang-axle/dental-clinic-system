@@ -3,7 +3,7 @@
  * No React, no side effects.
  */
 
-import type { Appointment, Role } from "./types";
+import type { Role } from "./types";
 import { ROUTES } from "./constants";
 
 export function initials(name: string): string {
@@ -32,18 +32,27 @@ export function roleLabel(role: Role): string {
   return "Patient · Client";
 }
 
+/** Returns today's date as YYYY-MM-DD in local time. */
+export function today(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+/** Returns current month as YYYY-MM. */
+export function thisMonth(): string {
+  return today().slice(0, 7);
+}
+
+/** Pluralise a word: plural(3, "appointment") → "3 appointments" */
+export function plural(n: number, word: string): string {
+  return `${n} ${word}${n !== 1 ? "s" : ""}`;
+}
+
 export function formatDateTime(value: string): string {
   return new Date(value).toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short" });
 }
 
 export function formatDate(value: string): string {
   return new Date(value).toLocaleDateString("en-PH", { dateStyle: "medium" });
-}
-
-/** Convert a paid appointment into a downloadable receipt — opens print dialog. */
-export function receiptHref(_a: Appointment): string {
-  // Kept for backward compat — callers should use downloadInvoice() instead
-  return "#";
 }
 
 /** Map a role to its dashboard route. */

@@ -7,10 +7,6 @@ function makeId(prefix: string) {
 }
 
 export const catalogService = {
-  async setPrice(id: string, price: number) {
-    await this.update(id, { price });
-  },
-
   async add(service: Omit<Service, "id">) {
     const snap = getSnapshot();
     const next: Service = { ...service, id: makeId("svc") };

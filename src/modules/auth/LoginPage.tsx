@@ -27,6 +27,12 @@ export function LoginPage({ navigate }: { navigate: (p: string) => void }) {
     try {
       const u = await authService.login(email, password);
       if (!u) { setError("Account not found. Please register first."); setLoading(false); return; }
+      if (u.active === false) {
+        await authService.logout();
+        setError("This account has been deactivated. Please contact the clinic.");
+        setLoading(false);
+        return;
+      }
       navigate(dashboardPathFor(u.role));
     } catch (err: any) {
       const code = err?.code ?? "";

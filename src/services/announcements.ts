@@ -13,11 +13,12 @@ export const announcementsService = {
 
     const { users } = getSnapshot();
 
-    // In-app notifications + email all users via Resend
+    // In-app notifications
     Promise.all(
-      users.map((u) => notificationsService.notify(u.id, `📢 ${title}`, body, "system"))
+      users.map((u) => notificationsService.notify(u.id, title, body, "system"))
     ).catch(() => {});
 
+    // Email all users with a registered email
     users.filter((u) => u.email).forEach((u) => {
       void emailService.sendAnnouncement(u.email!, title, body);
     });

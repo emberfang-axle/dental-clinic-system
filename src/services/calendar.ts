@@ -1,70 +1,59 @@
 import type { Appointment } from "../shared/types";
 import { BOOKING } from "../shared/constants";
+import { listCollection, setDocTyped, deleteDocTyped } from "./firestore";
 
 const BOOKING_SLOTS = BOOKING.TIME_SLOTS as readonly string[];
 
-/**
- * Demo-safe Google Calendar integration facade.
- * Replace internals with Cloud Functions + Google Calendar API for production.
- */
+type BlockedSlot = { id: string; date: string; time: string; reason?: string };
 
-type BlockedSlot = { date: string; time: string; reason?: string };
+// In-memory cache so UI reads are instant (populated on first load)
+let cache: BlockedSlot[] | null = null;
 
-const BLOCKED_KEY = "clinic-calendar-blocked-slots";
-
-function makeEventId() {
-  return `gcal_${Math.random().toString(16).slice(2)}_${Date.now().toString(16)}`;
-}
-
-function readBlockedSlots(): BlockedSlot[] {
-  try {
-    const raw = localStorage.getItem(BLOCKED_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeBlockedSlots(slots: BlockedSlot[]) {
-  localStorage.setItem(BLOCKED_KEY, JSON.stringify(slots));
+function makeSlotId(date: string, time: string) {
+  return `${date}_${time.replace(":", "")}`;
 }
 
 export const calendarService = {
-  listBlockedSlots() {
-    return readBlockedSlots().sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`));
+  /** Sync read from cache (populated after first async call). Falls back to [] before loaded. */
+  listBlockedSlots(): BlockedSlot[] {
+    return (cache ?? []).slice().sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`));
   },
 
-  isSlotBlocked(date: string, time: string) {
-    return readBlockedSlots().some((slot) => slot.date === date && slot.time === time);
+  async loadBlockedSlots(): Promise<BlockedSlot[]> {
+    cache = await listCollection<BlockedSlot>("blockedSlots");
+    return cache;
   },
 
-  blockSlot(date: string, time: string, reason = "Doctor unavailable") {
-    const slots = readBlockedSlots();
-    if (!slots.some((s) => s.date === date && s.time === time)) {
-      writeBlockedSlots([...slots, { date, time, reason }]);
-    }
+  isSlotBlocked(date: string, time: string): boolean {
+    return (cache ?? []).some((s) => s.date === date && s.time === time);
   },
 
-  unblockDate(date: string) {
-    writeBlockedSlots(readBlockedSlots().filter((s) => s.date !== date));
+  isDateBlocked(date: string): boolean {
+    return BOOKING_SLOTS.every((t) => (cache ?? []).some((s) => s.date === date && s.time === t));
   },
 
-  isDateBlocked(date: string) {
-    const slots = readBlockedSlots();
-    return BOOKING_SLOTS.every((t) => slots.some((s) => s.date === date && s.time === t));
+  async blockSlot(date: string, time: string, reason = "Doctor unavailable") {
+    const id = makeSlotId(date, time);
+    if ((cache ?? []).some((s) => s.id === id)) return;
+    const slot: BlockedSlot = { id, date, time, reason };
+    await setDocTyped("blockedSlots", id, slot as any);
+    cache = [...(cache ?? []), slot];
   },
 
-  unblockSlot(date: string, time: string) {
-    writeBlockedSlots(readBlockedSlots().filter((s) => !(s.date === date && s.time === time)));
+  async unblockSlot(date: string, time: string) {
+    const id = makeSlotId(date, time);
+    await deleteDocTyped("blockedSlots", id);
+    cache = (cache ?? []).filter((s) => s.id !== id);
   },
 
-  async createBookingEvent(appointment: Pick<Appointment, "patientName" | "serviceName" | "doctor" | "date" | "time">) {
-    // Demo: synthesize an event id.
-    // Production: call Cloud Function that writes to Google Calendar.
-    void appointment;
-    return makeEventId();
+  async unblockDate(date: string) {
+    const toRemove = (cache ?? []).filter((s) => s.date === date);
+    await Promise.all(toRemove.map((s) => deleteDocTyped("blockedSlots", s.id)));
+    cache = (cache ?? []).filter((s) => s.date !== date);
+  },
+
+  /** Stub: returns a fake calendar event ID. Replace with real Google Calendar API call when ready. */
+  async createBookingEvent(_appointment: Pick<Appointment, "patientName" | "serviceName" | "doctor" | "date" | "time">) {
+    return `gcal_${Math.random().toString(16).slice(2)}_${Date.now().toString(16)}`;
   },
 };
-

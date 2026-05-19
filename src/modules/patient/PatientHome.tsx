@@ -1,7 +1,9 @@
+import { useMemo } from "react";
 import { Badge, Button, Card, EmptyState } from "../../components/ui";
-import { StatGrid, AlertBanner } from "../../components/ui/DashboardWidgets";
+import { StatGrid, AlertBanner, LatestAnnouncement } from "../../components/ui/DashboardWidgets";
 import { useStore } from "../../store/store";
 import { ROUTES } from "../../shared/constants";
+import { today, plural } from "../../shared/helpers";
 
 export function PatientHome({
   navigate,
@@ -10,42 +12,63 @@ export function PatientHome({
   navigate: (p: string) => void;
   onTabChange: (t: string) => void;
 }) {
-  const { user, appointments, notifications } = useStore();
+  const { user, appointments, notifications, feedbacks } = useStore();
   if (!user) return null;
 
-  const today    = new Date().toISOString().slice(0, 10);
+  const todayStr = today();
   const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
-  const mine     = appointments.filter((a) => a.patientId === user.id);
 
-  const upcoming = [...mine]
-    .filter((a) => a.date >= today && a.status !== "cancelled")
-    .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time))[0];
+  const { mine, upcoming, unpaid, completed, recentSorted, topService, totalSpent, totalVisits } = useMemo(() => {
+    const mine = appointments.filter((a) => a.patientId === user.id);
 
-  const unpaid = mine.filter((a) => a.status === "completed" && a.paymentStatus === "unpaid");
-  const unread = notifications.filter((n) => n.userId === user.id && !n.read).length;
+    const upcoming = [...mine]
+      .filter((a) => a.date >= todayStr && a.status !== "cancelled")
+      .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time))[0];
 
-  const isToday    = upcoming?.date === today;
+    const unpaid    = mine.filter((a) => a.status === "completed" && a.paymentStatus === "unpaid");
+    const completed = mine.filter((a) => a.status === "completed");
+
+    const recentSorted = [...mine]
+      .sort((a, b) => (b.createdAt ?? b.date + b.time).localeCompare(a.createdAt ?? a.date + a.time))
+      .slice(0, 5);
+
+    const serviceCount: Record<string, number> = {};
+    let totalSpent = 0;
+    let totalVisits = 0;
+    for (const a of mine) {
+      serviceCount[a.serviceName] = (serviceCount[a.serviceName] || 0) + 1;
+      if (a.paymentStatus === "paid") totalSpent += a.price;
+      if (a.status !== "cancelled") totalVisits++;
+    }
+    const topService = Object.entries(serviceCount).sort((a, b) => b[1] - a[1])[0];
+
+    return { mine, upcoming, unpaid, completed, recentSorted, topService, totalSpent, totalVisits };
+  }, [appointments, user.id, todayStr]);
+
+  const unread     = notifications.filter((n) => n.userId === user.id && !n.read).length;
+  const isToday    = upcoming?.date === todayStr;
   const isTomorrow = upcoming?.date === tomorrow;
 
-  const completed    = mine.filter((a) => a.status === "completed");
-  const recentSorted = [...mine]
-    .sort((a, b) => (b.createdAt ?? b.date + b.time).localeCompare(a.createdAt ?? a.date + a.time))
-    .slice(0, 5);
-
-  const serviceCount: Record<string, number> = {};
-  mine.forEach((a) => { serviceCount[a.serviceName] = (serviceCount[a.serviceName] || 0) + 1; });
-  const topService = Object.entries(serviceCount).sort((a, b) => b[1] - a[1])[0];
-
-  // Show feedback prompt if last completed appointment has no feedback yet
-  const lastCompleted = completed.sort((a, b) => b.date.localeCompare(a.date))[0];
-  const { feedbacks } = useStore();
-  const hasGivenFeedback = feedbacks.some((f) => f.userId === user.id);
-  const showFeedbackPrompt = lastCompleted && !hasGivenFeedback;
+  const lastCompleted      = [...completed].sort((a, b) => b.date.localeCompare(a.date))[0];
+  const showFeedbackPrompt = lastCompleted && !feedbacks.some((f) => f.userId === user.id);
 
   return (
     <div className="space-y-6">
+      {/* ── Greeting ── */}
+      <div className="glass-strong rounded-2xl px-6 py-5 flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <p className="text-[10px] uppercase tracking-[0.26em] text-gold-300/55">Welcome back</p>
+          <h2 className="font-serif text-2xl text-gold-shine mt-0.5">{user.name.split(" ")[0]}</h2>
+          <p className="text-xs text-gold-100/50 mt-1">
+            {upcoming ? `Next appointment: ${upcoming.date} at ${upcoming.time}` : "No upcoming appointments"}
+          </p>
+        </div>
+        {!upcoming && (
+          <Button onClick={() => navigate(ROUTES.book)}>+ Book Appointment</Button>
+        )}
+      </div>
 
-      {/* ── Alerts ── */}
+      {/* ── Upcoming appointment alert ── */}
       {upcoming && (
         <div className={`rounded-xl border p-4 flex flex-wrap items-center justify-between gap-3 ${
           isToday    ? "border-red-500/40 bg-red-500/10" :
@@ -54,7 +77,7 @@ export function PatientHome({
         }`}>
           <div>
             <p className={`text-sm font-semibold ${isToday ? "text-red-300" : isTomorrow ? "text-yellow-300" : "text-gold-200"}`}>
-              {isToday ? "🦷 Appointment Today!" : isTomorrow ? "📅 Appointment Tomorrow" : "📅 Next Appointment"}
+              {isToday ? "Appointment Today" : isTomorrow ? "Appointment Tomorrow" : "Next Appointment"}
             </p>
             <p className="text-xs text-gold-100/60 mt-1">
               <span className="font-medium text-gold-200">{upcoming.serviceName}</span>
@@ -78,29 +101,22 @@ export function PatientHome({
 
       {unpaid.length > 0 && (
         <AlertBanner
-          message={`₱ ${unpaid.length} completed appointment${unpaid.length > 1 ? "s" : ""} with outstanding payment`}
-          action="Go to Payments"
-          onAction={() => onTabChange("payments")}
-          tone="amber"
-        />
+          message={`${plural(unpaid.length, "completed appointment")} with outstanding payment`}
+          action="Go to Payments" onAction={() => onTabChange("payments")} tone="amber" />
       )}
 
       {showFeedbackPrompt && (
-        <div className="rounded-xl border border-gold-500/30 bg-gold-500/8 p-4 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-sm font-semibold text-gold-200">How was your visit?</p>
-            <p className="text-xs text-gold-100/55 mt-0.5">Share your experience to help us improve our service.</p>
-          </div>
-          <Button size="sm" variant="outline" onClick={() => onTabChange("feedback")}>Leave Feedback ⭐</Button>
-        </div>
+        <AlertBanner
+          message="How was your last visit? Share your experience to help us improve."
+          action="Leave Feedback" onAction={() => onTabChange("feedback")} tone="amber" />
       )}
 
       {/* ── Stats ── */}
       <StatGrid onTabChange={onTabChange} stats={[
-        { label: "Total Visits",    value: mine.filter((a) => a.status !== "cancelled").length, sub: "all time",        tab: "my-appointments",   color: "text-gold-shine" },
-        { label: "Completed",       value: completed.length,                                    sub: "treatments done", tab: "treatment-records", color: "text-emerald-300" },
-        { label: "Pending Payment", value: unpaid.length,                                       sub: "needs attention", tab: "payments",          color: "text-amber-300" },
-        { label: "Notifications",   value: unread,                                              sub: "unread",          tab: "notifications",     color: "text-blue-300" },
+        { label: "Total Visits",  value: totalVisits,                         sub: "all time",        tab: "my-appointments",   color: "text-gold-shine" },
+        { label: "Completed",     value: completed.length,                    sub: "treatments done", tab: "treatment-records", color: "text-emerald-300" },
+        { label: "Total Spent",   value: `₱${totalSpent.toLocaleString()}`,   sub: "paid",            tab: "payments",          color: "text-blue-300" },
+        { label: "Notifications", value: unread,                              sub: "unread",          tab: "notifications",     color: unread > 0 ? "text-amber-300" : "text-gold-100/50" },
       ]} />
 
       {/* ── Main content ── */}
@@ -112,7 +128,7 @@ export function PatientHome({
           </div>
           {mine.length === 0 ? (
             <Card>
-              <EmptyState icon="📅" title="No appointments yet" subtitle="Book your first appointment to get started." />
+              <EmptyState icon="—" title="No appointments yet" subtitle="Book your first appointment to get started." />
               <div className="flex justify-center mt-4">
                 <Button onClick={() => navigate(ROUTES.book)}>Book Appointment</Button>
               </div>
@@ -168,10 +184,12 @@ export function PatientHome({
             </div>
           )}
 
+          <LatestAnnouncement onViewAll={() => onTabChange("notifications")} />
+
           {completed.length > 0 && (
             <button onClick={() => onTabChange("treatment-records")}
               className="w-full py-2.5 rounded-xl border border-gold-500/20 text-sm text-gold-300/70 hover:bg-gold-500/10 hover:text-gold-200 hover:border-gold-400/40 transition">
-              📋 View Treatment Records
+              View Treatment Records
             </button>
           )}
         </div>

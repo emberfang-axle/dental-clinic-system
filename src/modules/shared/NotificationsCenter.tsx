@@ -52,7 +52,7 @@ export function NotificationsCenter() {
       <div className="space-y-3" role="list">
         {mine.length === 0 && (
           <Card>
-            <EmptyState icon="🔔" title="No notifications yet" subtitle="You'll see appointment updates and reminders here." />
+            <EmptyState icon="—" title="No notifications yet" subtitle="You'll see appointment updates and reminders here." />
           </Card>
         )}
         {mine.map((n) => (
@@ -76,7 +76,7 @@ export function NotificationsCenter() {
               </div>
               {!n.read && (
                 <Button size="sm" variant="ghost" onClick={() => handleMarkRead(n.id)} aria-label="Mark as read">
-                  ✓ Read
+                  Mark Read
                 </Button>
               )}
             </div>

@@ -36,7 +36,6 @@ export function PatientFeedback() {
         <Card>
           <h3 className="font-serif text-2xl text-gold-gradient">Submit Feedback</h3>
           <div className="mt-6 rounded-xl border border-gold-500/20 bg-ink-900/40 p-6 text-center">
-            <div className="text-3xl mb-3">🦷</div>
             <p className="text-sm text-gold-100/60">Feedback is available after your first completed appointment.</p>
             <p className="text-xs text-gold-100/40 mt-1">Complete a visit to share your experience.</p>
           </div>
@@ -78,7 +77,7 @@ export function PatientFeedback() {
         <Button className="mt-5" disabled={submitting} onClick={submit}>
           {submitting ? "Submitting…" : "Submit Feedback"}
         </Button>
-        {sent && <p className="mt-3 text-emerald-400 text-sm">✓ Thank you for your feedback.</p>}
+        {sent && <p className="mt-3 text-emerald-400 text-sm">Thank you for your feedback.</p>}
       </Card>
 
       <Card>

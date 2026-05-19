@@ -3,8 +3,6 @@ import { getSnapshot, setState, showToast } from "../store/store";
 import { updateDocTyped, deleteDocTyped, setDocTyped } from "./firestore";
 import { calendarService } from "./calendar";
 import { notificationsService } from "./notifications";
-import { emailService } from "./email";
-import { smsService } from "./sms";
 
 function nowISO() { return new Date().toISOString(); }
 function makeId(prefix: string) {
@@ -72,26 +70,11 @@ export const appointmentsService = {
     addLog(sanitized.patientName, "Booked appointment", `${ap.serviceName} (${ap.date} ${ap.time})`, undefined, { status: ap.status, date: ap.date, time: ap.time });
     showToast(`Appointment booked for ${ap.date} at ${ap.time}.`, "success");
 
-    // Notify staff in-app. Email to patient sent via Resend.
     await notificationsService.notifyStaff(
       "New Appointment Booked",
       `${sanitized.patientName} booked ${sanitized.serviceName} on ${sanitized.date} at ${sanitized.time}. Please review and confirm.`,
       "appointment"
     );
-
-    if (sanitized.patientEmail) {
-      void emailService.sendBookingConfirmation({
-        patientEmail: sanitized.patientEmail,
-        patientName: sanitized.patientName,
-        serviceName: sanitized.serviceName,
-        date: sanitized.date,
-        time: sanitized.time,
-        doctor: sanitized.doctor,
-      });
-    }
-    if (sanitized.patientPhone) {
-      void smsService.booked(sanitized.patientPhone, sanitized.patientName, sanitized.serviceName, sanitized.date, sanitized.time);
-    }
 
     return ap;
   },
@@ -168,7 +151,6 @@ export const appointmentsService = {
     const before = current ? { status: current.status, paymentStatus: current.paymentStatus, date: current.date, time: current.time } : undefined;
     addLog(actor, "Updated appointment", id, before, { ...before, ...partial });
 
-    // Notifications and emails are fire-and-forget — must not block or throw on the main update.
     const notify = (fn: () => Promise<unknown>) => { fn().catch(() => {}); };
 
     if (partial.status === "confirmed") {
@@ -178,8 +160,6 @@ export const appointmentsService = {
           `Your ${current.serviceName} appointment on ${current.date} at ${current.time} has been confirmed. Please arrive 10 minutes early.`, "appointment"));
         notify(() => notificationsService.notifyStaff("Appointment Confirmed",
           `${current.patientName}'s ${current.serviceName} on ${current.date} at ${current.time} was confirmed by ${actor}.`, "appointment"));
-        if (current.patientEmail) void emailService.sendConfirmation({ patientEmail: current.patientEmail, patientName: current.patientName, serviceName: current.serviceName, date: current.date, time: current.time });
-        if (current.patientPhone) void smsService.confirmed(current.patientPhone, current.patientName, current.serviceName, current.date, current.time);
       }
     }
     if (partial.status === "in-progress" && current) {
@@ -189,30 +169,10 @@ export const appointmentsService = {
     if (partial.status === "completed" && current) {
       notify(() => notificationsService.notify(current.patientId, "Appointment Completed",
         `Your ${current.serviceName} appointment has been completed. Thank you for visiting Estandarte Dental Clinic!`, "appointment"));
-      if (current.patientEmail) void emailService.sendCompletion({ patientEmail: current.patientEmail, patientName: current.patientName, serviceName: current.serviceName });
-      if (current.patientPhone) void smsService.completed(current.patientPhone, current.patientName, current.serviceName);
     }
     if (partial.status === "no-show" && current) {
       notify(() => notificationsService.notifyStaff("Patient No-Show",
         `${current.patientName} did not show up for ${current.serviceName} on ${current.date} at ${current.time}.`, "appointment"));
-    }
-    if (partial.status === "cancelled" && current?.patientEmail) {
-      void emailService.sendCancellation({ patientEmail: current.patientEmail, patientName: current.patientName, serviceName: current.serviceName, date: current.date, time: current.time });
-    }
-    if (partial.status === "cancelled" && current?.patientPhone) {
-      void smsService.cancelled(current.patientPhone, current.patientName, current.serviceName, current.date, current.time);
-    }
-    if (partial.status === "rescheduled" && current?.patientEmail) {
-      void emailService.sendReschedule({ patientEmail: current.patientEmail, patientName: current.patientName, serviceName: current.serviceName, date: partial.date ?? current.date, time: partial.time ?? current.time });
-    }
-    if (partial.status === "rescheduled" && current?.patientPhone) {
-      void smsService.rescheduled(current.patientPhone, current.patientName, current.serviceName, partial.date ?? current.date, partial.time ?? current.time);
-    }
-    if (partial.paymentStatus === "paid" && current?.patientEmail) {
-      void emailService.sendPaymentConfirmation({ patientEmail: current.patientEmail, patientName: current.patientName, serviceName: current.serviceName, price: current.price, receiptNumber: partial.receiptNumber ?? current.receiptNumber });
-    }
-    if (partial.paymentStatus === "paid" && current?.patientPhone) {
-      void smsService.paid(current.patientPhone, current.patientName, current.serviceName, current.price, partial.receiptNumber ?? current.receiptNumber);
     }
   },
 };

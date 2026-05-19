@@ -58,6 +58,11 @@ function ProfileCard() {
         <div className="min-w-0">
           <div className="text-2xl font-serif text-gold-gradient truncate">{user.name}</div>
           <div className="text-sm text-gold-300/70">{roleLabel(user.role)}</div>
+          {user.patientNo && (
+            <div className="mt-1 inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.2em] text-gold-300/60 bg-gold-500/10 border border-gold-500/20 rounded px-2 py-0.5">
+              Patient ID: <span className="text-gold-300 font-semibold">{user.patientNo}</span>
+            </div>
+          )}
         </div>
         <Button size="sm" variant="outline" className="ml-auto shrink-0" onClick={() => { setEditing((v) => !v); setError(""); }}>
           {editing ? "Cancel" : "Edit"}
@@ -97,7 +102,7 @@ function ProfileCard() {
         </div>
       )}
 
-      {success && <p className="mt-3 text-emerald-400 text-sm" role="status">✓ Profile updated successfully.</p>}
+      {success && <p className="mt-3 text-emerald-400 text-sm" role="status">Profile updated successfully.</p>}
     </Card>
   );
 }
@@ -187,7 +192,7 @@ function MedicalHistoryForm({ userId, history }: { userId: string; history?: Med
       <Button className="mt-5" onClick={handleSave} disabled={saving}>
         {saving ? "Saving…" : "Save Medical History"}
       </Button>
-      {saved && <p className="mt-3 text-emerald-400 text-sm" role="status">✓ Medical history saved.</p>}
+      {saved && <p className="mt-3 text-emerald-400 text-sm" role="status">Medical history saved.</p>}
     </Card>
   );
 }

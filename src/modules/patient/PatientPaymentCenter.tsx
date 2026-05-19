@@ -36,7 +36,7 @@ function GCashSubmitForm({ appointmentId, price }: { appointmentId: string; pric
 
   if (done) return (
     <div className="rounded-xl border border-blue-500/30 bg-blue-500/8 p-4 text-sm text-blue-300">
-      ✓ Receipt submitted. Staff will verify your payment shortly.
+      Receipt submitted. Staff will verify your payment shortly.
     </div>
   );
 
@@ -80,8 +80,9 @@ function GCashSubmitForm({ appointmentId, price }: { appointmentId: string; pric
 
 export function PatientPaymentCenter() {
   const { appointments, user } = useStore();
+  if (!user) return null;
   const mine = appointments
-    .filter((a) => a.patientId === user!.id && a.status !== "cancelled")
+    .filter((a) => a.patientId === user.id && a.status !== "cancelled")
     .sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
 
   return (
@@ -109,19 +110,19 @@ export function PatientPaymentCenter() {
             <div className="mt-5">
               {a.paymentStatus === "paid" && (
                 <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 text-sm text-emerald-400">
-                  ✓ Payment confirmed via {a.paymentMethod === "gcash" ? "GCash" : "Cash"}.
+                  Payment confirmed via {a.paymentMethod === "gcash" ? "GCash" : "Cash"}.
                   {a.gcashRef && <span className="ml-2 text-emerald-300/70">Ref: {a.gcashRef}</span>}
                 </div>
               )}
               {a.paymentStatus === "pending_verification" && (
                 <div className="rounded-xl border border-blue-500/30 bg-blue-500/8 p-4 text-sm text-blue-300">
-                  ⏳ Payment proof submitted. Awaiting staff verification.
+                  Payment proof submitted. Awaiting staff verification.
                   {a.gcashRef && <span className="ml-2 text-blue-300/60">Ref: {a.gcashRef}</span>}
                 </div>
               )}
               {a.paymentStatus === "verified" && (
                 <div className="rounded-xl border border-purple-500/30 bg-purple-500/8 p-4 text-sm text-purple-300">
-                  ✓ Payment verified. Receipt will be issued after treatment completion.
+                  Payment verified. Receipt will be issued after treatment completion.
                 </div>
               )}
               {a.paymentStatus === "unpaid" && a.status === "completed" && (

@@ -2,6 +2,8 @@ import type { ClinicSettings, StaffPermission, StaffSubRole } from "../shared/ty
 import { getSnapshot, setState } from "../store/store";
 import { updateDocTyped, deleteDocTyped } from "./firestore";
 import { notificationsService } from "./notifications";
+import { getFunctions, httpsCallable } from "firebase/functions";
+import { app } from "./firebase";
 
 export const settingsService = {
   async updateClinic(partial: Partial<ClinicSettings>, actor: string) {
@@ -36,9 +38,20 @@ export const settingsService = {
   },
 
   async removeStaff(staffId: string) {
+    // 1. Immediately mark inactive + delete Firestore doc (works without functions)
     await deleteDocTyped("users", staffId);
     const { users } = getSnapshot();
     setState({ users: users.filter((u) => u.id !== staffId) });
+
+    // 2. Also delete the Firebase Auth account via Cloud Function (requires deployment)
+    try {
+      const fn = httpsCallable(getFunctions(app), "deleteAuthUser");
+      await fn({ uid: staffId });
+    } catch {
+      // Function not deployed yet — Firestore doc is already deleted above.
+      // The account can still log in to Firebase Auth but will get "Account not found"
+      // since their Firestore profile is gone.
+    }
   },
 };
 

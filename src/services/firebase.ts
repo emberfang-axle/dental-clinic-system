@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { getAuth, browserLocalPersistence, browserSessionPersistence, inMemoryPersistence, setPersistence } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import { GoogleAuthProvider } from "firebase/auth";
@@ -16,6 +16,23 @@ const firebaseConfig = {
 export const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 auth.languageCode = "en";
+
+// Pick the best available persistence without triggering localStorage access errors
+function isLocalStorageAvailable() {
+  try {
+    const key = "__ls_test__";
+    localStorage.setItem(key, "1");
+    localStorage.removeItem(key);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+setPersistence(
+  auth,
+  isLocalStorageAvailable() ? browserLocalPersistence : browserSessionPersistence
+).catch(() => setPersistence(auth, inMemoryPersistence).catch(() => {}));
 export const db = getFirestore(app);
 export const storage = getStorage(app);
 export const googleProvider = new GoogleAuthProvider();

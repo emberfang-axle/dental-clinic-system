@@ -1,4 +1,4 @@
-﻿import {
+import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
@@ -8,13 +8,23 @@
   getAuth,
 } from "firebase/auth";
 import { initializeApp, deleteApp } from "firebase/app";
+import { where } from "firebase/firestore";
 import type { Role, User } from "../shared/types";
 import { auth, app } from "./firebase";
-import { getDocTyped, setDocTyped, updateDocTyped } from "./firestore";
+import { getDocTyped, setDocTyped, updateDocTyped, listCollection } from "./firestore";
 import { getSnapshot, setState } from "../store/store";
 
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
+}
+
+async function generatePatientNo(): Promise<string> {
+  const patients = await listCollection<User>("users", [where("role", "==", "patient")]);
+  const max = patients.reduce((m, u) => {
+    const n = parseInt(u.patientNo?.replace("PT-", "") ?? "0", 10);
+    return n > m ? n : m;
+  }, 0);
+  return `PT-${String(max + 1).padStart(4, "0")}`;
 }
 
 
@@ -31,8 +41,11 @@ export const authService = {
     const res = await createUserWithEmailAndPassword(auth, normalizeEmail(email), password);
     if (name?.trim()) await updateFirebaseProfile(res.user, { displayName: name.trim() });
 
+    const patientNo = await generatePatientNo();
+
     const user: User = {
       id: res.user.uid,
+      patientNo,
       name: name.trim() || "New Patient",
       firstName: firstName?.trim(),
       lastName: lastName?.trim(),
@@ -47,11 +60,7 @@ export const authService = {
   },
 
   async googleSignIn(): Promise<void> {
-    // Handled by GoogleSignInButton component directly via signInWithPopup
-  },
-
-  async handleRedirectResult(): Promise<User | null> {
-    return null;
+    // Google sign-in is handled by GoogleSignInButton component via signInWithPopup
   },
 
   async logout() {
