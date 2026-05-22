@@ -1,7 +1,27 @@
 import type { Appointment } from "../shared/types";
 import { CLINIC } from "../shared/constants";
 
+
 const LOGO_URL = () => `${window.location.origin}/images/logo.png`;
+
+function formatTime12h(time: string) {
+  if (!time) return "";
+
+  const [hours, minutes] = time.split(":").map(Number);
+
+  return new Date(
+    0,
+    0,
+    0,
+    hours,
+    minutes
+  ).toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
 
 /** Opens a printable Daily Record sheet — one row per appointment, dental clinic format. */
 export function downloadTreatmentNotes(a: Appointment) {
@@ -85,7 +105,7 @@ export function downloadTreatmentNotes(a: Appointment) {
     <div class="meta-item"><span class="lbl">Date</span><span class="val">${apptDate}</span></div>
     <div class="meta-item"><span class="lbl">Patient</span><span class="val">${a.patientName}</span></div>
     <div class="meta-item"><span class="lbl">Dentist</span><span class="val">${a.doctor}</span></div>
-    <div class="meta-item"><span class="lbl">Time</span><span class="val">${a.time}</span></div>
+    <div class="meta-item"><span class="lbl">Time</span><span class="val">${formatTime12h(a.time)}</span></div>
     <div class="meta-item"><span class="lbl">Status</span><span class="val" style="text-transform:capitalize">${a.status}</span></div>
   </div>
 
@@ -318,7 +338,7 @@ export function downloadInvoice(a: Appointment) {
         <tr><td>Invoice No.</td><td><strong>${invoiceNo}</strong></td></tr>
         <tr><td>Date Issued</td><td>${issuedDate}</td></tr>
         <tr><td>Due Date</td><td>${dueDate}</td></tr>
-        <tr><td>Appointment</td><td>${apptDate} &nbsp;${a.time}</td></tr>
+        <tr><td>Appointment</td><td>${apptDate} &nbsp;${formatTime12h(a.time)}</td></tr>
       </table>
     </div>
   </div>
@@ -398,7 +418,7 @@ export function downloadInvoice(a: Appointment) {
     <div class="info-box">
       <div class="label">Appointment Info</div>
       <div class="info-row"><span>Date</span><span>${apptDate}</span></div>
-      <div class="info-row"><span>Time</span><span>${a.time}</span></div>
+      <div class="info-row"><span>Time</span><span>${formatTime12h(a.time)}</span></div>
       <div class="info-row"><span>Status</span><span style="text-transform:capitalize">${a.status}</span></div>
       ${a.source ? `<div class="info-row"><span>Source</span><span style="text-transform:capitalize">${a.source}</span></div>` : ""}
     </div>

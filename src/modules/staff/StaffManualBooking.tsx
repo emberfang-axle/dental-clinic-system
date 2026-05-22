@@ -11,6 +11,7 @@ import { BOOKING } from "../../shared/constants";
 import { KNOWN_DOCTOR_NAMES } from "../../services/bootstrap";
 import type { AppointmentSource } from "../../shared/types";
 
+
 const defaultDoctors: string[] = [];
 
 const tomorrow = () => {
@@ -18,6 +19,25 @@ const tomorrow = () => {
   d.setDate(d.getDate() + 1);
   return d.toISOString().slice(0, 10);
 };
+
+function formatTime12h(time: string) {
+  if (!time) return "";
+
+  const [hours, minutes] = time.split(":").map(Number);
+
+  return new Date(
+    0,
+    0,
+    0,
+    hours,
+    minutes
+  ).toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
 
 export function StaffManualBooking({ onClose }: { onClose: () => void }) {
   const { services, users } = useStore();
@@ -83,7 +103,7 @@ export function StaffManualBooking({ onClose }: { onClose: () => void }) {
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#34d399" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
         </div>
         <p className="text-gold-100 font-medium">Appointment booked for <span className="text-gold-300">{patientName}</span></p>
-        <p className="text-xs text-gold-100/50">{service?.name} · {date} at {time}</p>
+        <p className="text-xs text-gold-100/50">{service?.name} · {date} at {formatTime12h(time)}</p>
         <div className="flex justify-center gap-3 pt-2">
           <Button onClick={() => { setDone(false); setPatientName(""); setPatientPhone(""); setTime(""); }}>Book Another</Button>
           <Button variant="ghost" onClick={onClose}>Close</Button>

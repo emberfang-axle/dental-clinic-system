@@ -51,6 +51,25 @@ export function StaffDashboard({ navigate }: { navigate: (p: string) => void }) 
   );
 }
 
+function formatTime12h(time: string) {
+  if (!time) return "";
+
+  const [hours, minutes] = time.split(":").map(Number);
+
+  return new Date(
+    0,
+    0,
+    0,
+    hours,
+    minutes
+  ).toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
+
 function StaffOverview({ onTabChange }: { onTabChange: (t: string) => void }) {
   const { appointments } = useStore();
 
@@ -147,7 +166,7 @@ function StaffOverview({ onTabChange }: { onTabChange: (t: string) => void }) {
                   <div key={a.id} className="glass rounded-lg px-3 py-2.5 flex items-center justify-between gap-2">
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-gold-100 truncate">{a.patientName}</p>
-                      <p className="text-xs text-gold-100/45">{a.time} · {a.serviceName}</p>
+                      <p className="text-xs text-gold-100/45">{formatTime12h(a.time)} · {a.serviceName}</p>
                     </div>
                     {a.emergency && <Badge tone="emergency">!</Badge>}
                   </div>

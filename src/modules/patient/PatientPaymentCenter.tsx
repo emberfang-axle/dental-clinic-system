@@ -6,6 +6,25 @@ import { PaymentBadge, AppointmentTimeline } from "../appointment/AppointmentsLi
 import { paymentsService } from "../../services/payments";
 import { uploadFile } from "../../services/upload";
 
+function formatTime12h(time: string) {
+  if (!time) return "";
+
+  const [hours, minutes] = time.split(":").map(Number);
+
+  return new Date(
+    0,
+    0,
+    0,
+    hours,
+    minutes
+  ).toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
+
 function GCashSubmitForm({ appointmentId, price }: { appointmentId: string; price: number }) {
   const { user, settings } = useStore();
   const [file, setFile] = useState<File | null>(null);
@@ -97,7 +116,7 @@ export function PatientPaymentCenter() {
                   <Badge tone={a.status as any}>{a.status}</Badge>
                   <PaymentBadge status={a.paymentStatus} method={a.paymentMethod === "gcash" ? "GCash" : "Cash"} />
                 </div>
-                <p className="mt-2 text-sm text-gold-100/60">{a.date} at {a.time} · ₱{a.price.toLocaleString()}</p>
+                <p className="mt-2 text-sm text-gold-100/60">{a.date} at {formatTime12h(a.time)} · ₱{a.price.toLocaleString()}</p>
               </div>
               <div className="flex gap-3 flex-wrap">
                 <button onClick={() => downloadInvoice(a)} disabled={a.status !== "completed"}

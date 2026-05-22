@@ -15,12 +15,13 @@ import { useStore } from "../../store/store";
 import { BOOKING, ROUTES } from "../../shared/constants";
 import { dashboardPathFor } from "../../shared/helpers";
 
+
 const SERVICE_CATEGORIES = [
-  { label: "Preventive Care",        names: ["oral consultation", "oral prophylaxis (cleaning)", "teeth whitening"] },
+  { label: "Preventive Care", names: ["oral consultation", "oral prophylaxis (cleaning)", "teeth whitening"] },
   { label: "Restorative Treatments", names: ["tooth filling (pasta)", "root canal treatment", "dental crowns", "crowns and bridges", "fixed bridge", "veneers"] },
-  { label: "Orthodontics",           names: ["orthodontics (braces)", "braces adjustment"] },
-  { label: "Prosthodontics",         names: ["dentures", "removable dentures", "ivocap dentures"] },
-  { label: "Surgical / Emergency",   names: ["tooth extraction (bunot)", "odontectomy (3rd molar removal)", "emergency dental services"] },
+  { label: "Orthodontics", names: ["orthodontics (braces)", "braces adjustment"] },
+  { label: "Prosthodontics", names: ["dentures", "removable dentures", "ivocap dentures"] },
+  { label: "Surgical / Emergency", names: ["tooth extraction (bunot)", "odontectomy (3rd molar removal)", "emergency dental services"] },
 ];
 
 export function BookAppointmentPage({ navigate }: { navigate: (p: string) => void }) {
@@ -39,7 +40,8 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
   const [serviceId, setServiceId] = useState(() => services[0]?.id ?? "");
   const [doctor, setDoctor] = useState(() => doctorOptions[0]?.name ?? "");
   const [date, setDate] = useState(() => {
-    const d = new Date(); d.setDate(d.getDate() + 1);
+    const d = new Date();
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
     return d.toISOString().slice(0, 10);
   });
   const [time, setTime] = useState("");
@@ -84,20 +86,55 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
 
   function next() {
     setBookingError("");
-    if (step === 2 && !doctor) { setBookingError("Please select a doctor."); return; }
+
+    if (step === 2 && !doctor) {
+      setBookingError("Please select a doctor.");
+      return;
+    }
+
     if (step === 3) {
-      if (!time) { setBookingError("Please select a time slot."); return; }
+      if (!time) {
+        setBookingError("Please select a time slot.");
+        return;
+      }
+
       const today = new Date().toISOString().slice(0, 10);
-      if (date < today) { setBookingError("Please select a future date."); return; }
-      if (new Date(date + "T00:00:00").getDay() === 0) { setBookingError("The clinic is closed on Sundays. Please pick another day."); return; }
-      if (patientConflict) { setBookingError(`You already have an appointment on ${date} at ${time}. Please choose a different time.`); return; }
+
+      if (date < today) {
+        setBookingError("Please select a future date.");
+        return;
+      }
+
+      if (new Date(date + "T00:00:00").getDay() === 0) {
+        setBookingError(
+          "The clinic is closed on Sundays. Please pick another day."
+        );
+        return;
+      }
+
+      if (patientConflict) {
+        setBookingError(
+          `You already have an appointment on ${date} at ${formatTime12h(
+            time
+          )}. Please choose a different time.`
+        );
+        return;
+      }
+
       const maxPerDay = settings?.maxAppointmentsPerDay ?? 7;
-      const bookedOnDate = appointments.filter((a) => a.date === date && a.status !== "cancelled").length;
+
+      const bookedOnDate = appointments.filter(
+        (a) => a.date === date && a.status !== "cancelled"
+      ).length;
+
       if (bookedOnDate >= maxPerDay) {
-        setBookingError(`This date is fully booked (${maxPerDay} appointments). Please choose another date.`);
+        setBookingError(
+          `This date is fully booked (${maxPerDay} appointments). Please choose another date.`
+        );
         return;
       }
     }
+
     setStep((s) => Math.min(s + 1, 4));
   }
   function back() { setStep((s) => Math.max(s - 1, 1)); }
@@ -144,7 +181,7 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
       <Centered navigate={navigate}>
         <div className="max-w-lg w-full glass-strong rounded-2xl p-10 text-center shadow-luxe fade-up">
           <div className="w-20 h-20 mx-auto rounded-full bg-gradient-to-br from-emerald-500/30 to-emerald-700/10 border border-emerald-400/40 flex items-center justify-center mb-6">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#34d399" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#34d399" strokeWidth="2.5"><polyline points="20 6 9 17 4 12" /></svg>
           </div>
           <p className="text-[10px] uppercase tracking-[0.4em] text-gold-400 font-semibold mb-3">Confirmed</p>
           <h2 className="font-serif text-4xl text-gold-shine font-light">
@@ -153,7 +190,7 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
           <p className="text-gold-100/70 mt-5 leading-relaxed">
             Your appointment for <span className="text-gold-300 font-medium">{service.name}</span> on{" "}
             <span className="text-gold-300 font-medium">{date}</span> at{" "}
-            <span className="text-gold-300 font-medium">{time}</span> has been received.
+            <span className="text-gold-300 font-medium">{formatTime12h(time)}</span> has been received.
           </p>
           <p className="text-sm text-gold-100/55 mt-3">Please arrive 10 minutes before your scheduled appointment.</p>
 
@@ -211,12 +248,11 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
             const current = step === i + 1;
             return (
               <div key={label} className="flex items-center flex-1 last:flex-none">
-                <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-all ${
-                  current ? "bg-gold-gradient text-ink-950 border-gold-300 shadow-gold scale-110"
+                <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-all ${current ? "bg-gold-gradient text-ink-950 border-gold-300 shadow-gold scale-110"
                   : active ? "bg-gold-500/20 text-gold-200 border-gold-400"
-                  : "border-gold-500/20 text-gold-100/30"
-                }`}>
-                  {step > i + 1 ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg> : i + 1}
+                    : "border-gold-500/20 text-gold-100/30"
+                  }`}>
+                  {step > i + 1 ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg> : i + 1}
                 </div>
                 <div className={`ml-2 text-[10px] uppercase tracking-wider hidden sm:block font-semibold ${active ? "text-gold-200" : "text-gold-100/30"}`}>{label}</div>
                 {i < 3 && <div className={`flex-1 h-px mx-3 transition-all ${step > i + 1 ? "bg-gold-400" : "bg-gold-500/15"}`} />}
@@ -321,7 +357,11 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
                   <Input
                     type="date"
                     value={date}
-                    min={(() => { const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().slice(0, 10); })()}
+                    min={(() => {
+                      const d = new Date();
+                      d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+                      return d.toISOString().slice(0, 10);
+                    })()}
                     onChange={(e) => {
                       const val = e.target.value;
                       if (new Date(val + "T00:00:00").getDay() === 0) {
@@ -350,34 +390,42 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
                     {availableSlots.map((t) => {
                       const taken = takenTimes.includes(t);
                       const selected = time === t;
-                      // Count how many bookings on this slot (for tooltip)
+
                       const slotCount = appointments.filter(
-                        (a) => a.date === date && a.time === t && a.status !== "cancelled"
+                        (a) =>
+                          a.date === date &&
+                          a.time === t &&
+                          a.status !== "cancelled"
                       ).length;
+
                       return (
                         <div key={t} className="relative group/slot">
                           <button
                             disabled={taken}
                             onClick={() => setTime(t)}
-                            className={`w-full px-3 py-2 rounded-lg text-sm border transition ${
-                              selected
-                                ? "bg-gold-gradient text-ink-950 border-gold-400 font-semibold"
-                                : taken
+                            className={`w-full px-3 py-2 rounded-lg text-sm border transition ${selected
+                              ? "bg-gold-gradient text-ink-950 border-gold-400 font-semibold"
+                              : taken
                                 ? "border-red-500/30 text-red-400/40 line-through cursor-not-allowed bg-red-500/5"
                                 : "border-gold-500/30 text-gold-100/80 hover:border-gold-400 hover:bg-gold-500/5"
-                            }`}
+                              }`}
                           >
-                            {t}
+                            {formatTime12h(t)}
                           </button>
-                          {/* Tooltip — hidden on touch, shown on hover for desktop */}
+
                           {taken && (
                             <div className="pointer-events-none absolute bottom-full left-0 mb-2 z-20 opacity-0 group-hover/slot:opacity-100 transition-opacity duration-150 hidden sm:block">
                               <div className="bg-ink-800 border border-red-500/40 text-red-300 text-[10px] font-semibold px-2.5 py-1.5 rounded-lg whitespace-nowrap shadow-lg">
                                 Slot Unavailable
-                                <div className="text-red-400/60 font-normal">{slotCount} booking{slotCount !== 1 ? "s" : ""} on this time</div>
+
+                                <div className="text-red-400/60 font-normal">
+                                  {slotCount} booking
+                                  {slotCount !== 1 ? "s" : ""} at {formatTime12h(t)}
+                                </div>
                               </div>
                             </div>
                           )}
+
                           {!taken && !selected && (
                             <div className="pointer-events-none absolute bottom-full left-0 mb-2 z-20 opacity-0 group-hover/slot:opacity-100 transition-opacity duration-150 hidden sm:block">
                               <div className="bg-ink-800 border border-gold-500/30 text-gold-300 text-[10px] font-semibold px-2.5 py-1.5 rounded-lg whitespace-nowrap shadow-lg">
@@ -430,11 +478,19 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
                 <Row label="Patient" value={user.name} />
                 <Row label="Service" value={service!.name} />
                 <Row label="Doctor" value={doctor} />
-                <Row label="Date & Time" value={`${date} · ${time || "—"}`} />
+                <Row
+                  label="Date & Time"
+                  value={`${date} · ${time ? formatTime12h(time) : "—"
+                    }`}
+                />
                 {emergency && <Row label="Priority" value={<Badge tone="emergency">EMERGENCY</Badge>} />}
               </div>
             </div>
           )}
+
+
+
+
 
           <div className="mt-8 pt-6 border-t border-gold-500/15 flex flex-col gap-3">
             {bookingError && (
@@ -453,6 +509,25 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
       </div>
     </div>
   );
+}
+
+
+function formatTime12h(time: string) {
+  if (!time) return "";
+
+  const [hours, minutes] = time.split(":").map(Number);
+
+  return new Date(
+    0,
+    0,
+    0,
+    hours,
+    minutes
+  ).toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
 }
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {

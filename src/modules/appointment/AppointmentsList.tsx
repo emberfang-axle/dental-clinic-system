@@ -5,6 +5,7 @@ import { useStore } from "../../store/store";
 import { BOOKING } from "../../shared/constants";
 import type { Appointment, AppointmentStatus, PaymentStatus, Role } from "../../shared/types";
 
+
 const PAGE_SIZE = 10;
 
 export function AppointmentsList({ role, patientOnly }: { role: Role | "admin"; patientOnly?: boolean }) {
@@ -142,6 +143,25 @@ export function AppointmentsList({ role, patientOnly }: { role: Role | "admin"; 
   );
 }
 
+function formatTime12h(time: string) {
+  if (!time) return "";
+
+  const [hours, minutes] = time.split(":").map(Number);
+
+  return new Date(
+    0,
+    0,
+    0,
+    hours,
+    minutes
+  ).toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
+
 const AppointmentCard = memo(function AppointmentCard({ a, role, isSelf, actor }: { a: Appointment; role: Role | "admin"; isSelf: boolean; actor: string }) {
   const { appointments } = useStore();
   const [rescheduling, setRescheduling] = useState(false);
@@ -202,7 +222,7 @@ const AppointmentCard = memo(function AppointmentCard({ a, role, isSelf, actor }
         <div className="min-w-0">
           {role !== "patient" && <p className="font-semibold text-gold-100 text-sm">{a.patientName}</p>}
           <p className="text-gold-100/80 font-medium text-sm">{a.serviceName}</p>
-          <p className="text-xs text-gold-100/55 mt-0.5">{a.date} · {a.time} · {a.doctor}</p>
+          <p className="text-xs text-gold-100/55 mt-0.5">{a.date} · {formatTime12h(a.time)} · {a.doctor}</p>
           {a.source && a.source !== "online" && (
             <p className="text-[10px] text-gold-300/50 mt-0.5 uppercase tracking-wider">via {a.source}</p>
           )}
@@ -291,7 +311,7 @@ const AppointmentCard = memo(function AppointmentCard({ a, role, isSelf, actor }
       <ConfirmDialog
         open={confirmCancel}
         title="Cancel Appointment"
-        message={`Are you sure you want to cancel your ${a.serviceName} appointment on ${a.date} at ${a.time}? This cannot be undone. Note: repeated cancellations may affect future bookings.`}
+        message={`Are you sure you want to cancel your ${a.serviceName} appointment on ${a.date} at ${formatTime12h(a.time)}? This cannot be undone. Note: repeated cancellations may affect future bookings.`}
         confirmLabel="Yes, Cancel"
         danger
         onConfirm={() => { setConfirmCancel(false); appointmentsService.cancelAndNotify(a.id, actor); }}
