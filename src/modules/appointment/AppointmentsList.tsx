@@ -1,8 +1,9 @@
-import { memo, useState, useCallback } from "react";
-import { Badge, Button, Card, ConfirmDialog, EmptyState, Input, Select } from "../../components/ui";
+import { useState, useCallback, Fragment } from "react";
+import { Badge, Button, Card, ConfirmDialog, Input, Select } from "../../components/ui";
 import { appointmentsService } from "../../services/appointments";
 import { useStore } from "../../store/store";
-import { BOOKING } from "../../shared/constants";
+import { BOOKING, getSlotsForDate } from "../../shared/constants";
+import { formatTime12h } from "../../shared/helpers";
 import type { Appointment, AppointmentStatus, PaymentStatus, Role } from "../../shared/types";
 
 
@@ -12,16 +13,16 @@ export function AppointmentsList({ role, patientOnly }: { role: Role | "admin"; 
   const { appointments = [], user } = useStore();
   const [filter, setFilter] = useState<"all" | AppointmentStatus>("all");
   const [search, setSearch] = useState("");
-  const [sort, setSort] = useState<"recent" | "alpha">("recent");
   const [page, setPage] = useState(1);
+  const [expanded, setExpanded] = useState<string | null>(null);
 
-  // Reminder banner — upcoming appointments today or tomorrow for patients
-  const today = new Date().toISOString().slice(0, 10);
+  const todayStr = new Date().toISOString().slice(0, 10);
   const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+
   const upcoming = patientOnly && user
     ? appointments.filter(
         (a) => a.patientId === user.id &&
-          (a.date === today || a.date === tomorrow) &&
+          (a.date === todayStr || a.date === tomorrow) &&
           (a.status === "pending" || a.status === "confirmed")
       )
     : [];
@@ -33,13 +34,11 @@ export function AppointmentsList({ role, patientOnly }: { role: Role | "admin"; 
   if (filter !== "all") list = list.filter((a) => a.status === filter);
   if (search) {
     const q = search.toLowerCase();
-    list = list.filter((a) => `${a.patientName}${a.serviceName}`.toLowerCase().includes(q));
+    list = list.filter((a) => `${a.patientName}${a.serviceName}${a.doctor}`.toLowerCase().includes(q));
   }
 
-  // Sort: recently booked (createdAt desc) or alphabetical (patientName A→Z)
-  list = sort === "alpha"
-    ? list.sort((a, b) => a.patientName.localeCompare(b.patientName))
-    : list.sort((a, b) => (b.createdAt ?? b.date + b.time).localeCompare(a.createdAt ?? a.date + a.time));
+  // Latest first (newest createdAt on top) — as requested by panel
+  list = list.sort((a, b) => (b.createdAt ?? b.date + b.time).localeCompare(a.createdAt ?? a.date + a.time));
 
   const totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
@@ -47,36 +46,35 @@ export function AppointmentsList({ role, patientOnly }: { role: Role | "admin"; 
 
   function onFilterChange(val: string) { setFilter(val as any); setPage(1); }
   function onSearchChange(val: string) { setSearch(val); setPage(1); }
-  function onSortChange(val: "recent" | "alpha") { setSort(val); setPage(1); }
 
   return (
     <div className="space-y-4">
-      {/* Reminder banner for today/tomorrow appointments */}
+      {/* Reminder banners */}
       {upcoming.map((a) => (
         <div key={a.id} className={`rounded-xl border p-4 flex flex-wrap items-center justify-between gap-3 ${
-          a.date === today
-            ? "border-red-500/40 bg-red-500/10"
-            : "border-yellow-500/40 bg-yellow-500/10"
+          a.date === todayStr ? "border-red-500/40 bg-red-500/10" : "border-yellow-500/40 bg-yellow-500/10"
         }`}>
           <div>
-            <p className={`text-sm font-semibold ${a.date === today ? "text-red-300" : "text-yellow-300"}`}>
-              {a.date === today ? "Appointment Today!" : "Appointment Tomorrow"}
+            <p className={`text-sm font-semibold ${a.date === todayStr ? "text-red-300" : "text-yellow-300"}`}>
+              {a.date === todayStr ? "Appointment Today!" : "Appointment Tomorrow"}
             </p>
             <p className="text-xs text-gold-100/60 mt-0.5">
               {a.serviceName} at {a.time} with {a.doctor}. Please arrive 10 minutes early.
             </p>
           </div>
           <span className={`text-xs font-bold uppercase tracking-wider px-2 py-1 rounded ${
-            a.date === today ? "bg-red-500/20 text-red-300" : "bg-yellow-500/20 text-yellow-300"
+            a.date === todayStr ? "bg-red-500/20 text-red-300" : "bg-yellow-500/20 text-yellow-300"
           }`}>
-            {a.date === today ? "Today" : "Tomorrow"}
+            {a.date === todayStr ? "Today" : "Tomorrow"}
           </span>
         </div>
       ))}
+
+      {/* Toolbar */}
       <Card className="!p-4">
         <div className="flex flex-wrap items-center gap-3">
           <Input
-            placeholder="Search patient, service…"
+            placeholder="Search patient, service, doctor…"
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
             className="max-w-xs"
@@ -97,40 +95,84 @@ export function AppointmentsList({ role, patientOnly }: { role: Role | "admin"; 
             <option value="rescheduled">Rescheduled</option>
             <option value="cancelled">Cancelled</option>
           </Select>
-          {/* Sort toggle */}
-          <div className="flex rounded-lg border border-gold-500/20 overflow-hidden text-xs">
-            <button
-              onClick={() => onSortChange("recent")}
-              className={`px-3 py-2 transition ${sort === "recent" ? "bg-gold-500/15 text-gold-200" : "text-gold-100/50 hover:text-gold-200"}`}
-            >
-              Recently Booked
-            </button>
-            <button
-              onClick={() => onSortChange("alpha")}
-              className={`px-3 py-2 border-l border-gold-500/20 transition ${sort === "alpha" ? "bg-gold-500/15 text-gold-200" : "text-gold-100/50 hover:text-gold-200"}`}
-            >
-              A → Z
-            </button>
-          </div>
           <span className="text-xs text-gold-100/50 ml-auto">{list.length} appointment(s)</span>
         </div>
       </Card>
 
-      {paged.length === 0 && (
-        <Card>
-          <EmptyState
-            icon="—"
-            title="No appointments found"
-            subtitle={search || filter !== "all" ? "Try adjusting your search or filter." : "No appointments have been booked yet."}
-          />
-        </Card>
-      )}
-
-      <div className="space-y-3">
-        {paged.map((a) => (
-          <AppointmentCard key={a.id} a={a} role={role} isSelf={a.patientId === user?.id} actor={user?.name || "system"} />
-        ))}
-      </div>
+      {/* Data Table */}
+      <Card className="!p-0 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[700px]">
+            <thead className="border-b border-gold-500/15 bg-ink-900/60">
+              <tr className="text-left text-[10px] uppercase tracking-wider text-gold-300/60">
+                <th className="px-4 py-3">Date & Time</th>
+                {role !== "patient" && <th className="px-4 py-3">Patient</th>}
+                <th className="px-4 py-3">Service</th>
+                <th className="px-4 py-3">Doctor</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Payment</th>
+                <th className="px-4 py-3"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {paged.length === 0 && (
+                <tr>
+                  <td colSpan={role !== "patient" ? 7 : 6} className="px-4 py-8 text-center text-sm text-gold-100/40">
+                    {search || filter !== "all" ? "No appointments match your filter." : "No appointments yet."}
+                  </td>
+                </tr>
+              )}
+              {paged.map((a) => {
+                const isToday = a.date === todayStr;
+                const isTomorrow = a.date === tomorrow;
+                const isOpen = expanded === a.id;
+                return (
+                  <Fragment key={a.id}>
+                    <tr
+                      className={`border-b border-gold-500/10 hover:bg-gold-500/5 transition cursor-pointer ${isOpen ? "bg-gold-500/5" : ""}`}
+                      onClick={() => setExpanded(isOpen ? null : a.id)}
+                    >
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          <span className="text-gold-100 font-medium">{a.date}</span>
+                          {isToday && <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-300 font-bold uppercase">Today</span>}
+                          {isTomorrow && <span className="text-[9px] px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-300 font-bold uppercase">Tomorrow</span>}
+                        </div>
+                        <div className="text-xs text-gold-100/50">{formatTime12h(a.time)}</div>
+                      </td>
+                      {role !== "patient" && (
+                        <td className="px-4 py-3">
+                          <div className="text-gold-100 font-medium">{a.patientName}</div>
+                        </td>
+                      )}
+                      <td className="px-4 py-3 text-gold-100/80">{a.serviceName}</td>
+                      <td className="px-4 py-3 text-gold-100/70 text-xs">{a.doctor}</td>
+                      <td className="px-4 py-3">
+                        <Badge tone={a.status === "in-progress" ? "confirmed" : a.status === "no-show" ? "cancelled" : a.status === "rescheduled" ? "pending" : a.status as any}>
+                          {a.status}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3">
+                        <PaymentBadge status={a.paymentStatus} method="Cash" />
+                      </td>
+                      <td className="px-4 py-3 text-right text-gold-100/40 text-xs select-none">
+                        {isOpen ? "▲" : "▼"}
+                      </td>
+                    </tr>
+                    {isOpen && (
+                      <tr className="border-b border-gold-500/10 bg-ink-900/40">
+                        <td colSpan={role !== "patient" ? 7 : 6} className="px-4 py-4">
+                          <AppointmentDetail a={a} role={role} isSelf={a.patientId === user?.id} actor={user?.name || "system"} />
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </Card>
 
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-2 pt-2" role="navigation" aria-label="Pagination">
@@ -143,26 +185,8 @@ export function AppointmentsList({ role, patientOnly }: { role: Role | "admin"; 
   );
 }
 
-function formatTime12h(time: string) {
-  if (!time) return "";
-
-  const [hours, minutes] = time.split(":").map(Number);
-
-  return new Date(
-    0,
-    0,
-    0,
-    hours,
-    minutes
-  ).toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
-}
-
-
-const AppointmentCard = memo(function AppointmentCard({ a, role, isSelf, actor }: { a: Appointment; role: Role | "admin"; isSelf: boolean; actor: string }) {
+/** Expanded detail row shown when a table row is clicked */
+function AppointmentDetail({ a, role, isSelf, actor }: { a: Appointment; role: Role | "admin"; isSelf: boolean; actor: string }) {
   const { appointments } = useStore();
   const [rescheduling, setRescheduling] = useState(false);
   const [newDate, setNewDate] = useState(a.date);
@@ -170,20 +194,17 @@ const AppointmentCard = memo(function AppointmentCard({ a, role, isSelf, actor }
   const [saving, setSaving] = useState(false);
   const [rescheduleError, setRescheduleError] = useState("");
   const [confirmCancel, setConfirmCancel] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [actionError, setActionError] = useState("");
+  const [pendingAction, setPendingAction] = useState<{ label: string; data: Partial<Appointment> } | null>(null);
 
   const update = useCallback(async (data: Partial<Appointment>) => {
     setActionError("");
-    try {
-      await appointmentsService.update(a.id, data, actor);
-    } catch (err: any) {
-      setActionError(err.message || "Action failed.");
-    }
+    try { await appointmentsService.update(a.id, data, actor); }
+    catch (err: any) { setActionError(err.message || "Action failed."); }
   }, [a.id, actor]);
 
-  const today = new Date().toISOString().slice(0, 10);
-  const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
-  const reminderBadge = a.date === today ? "Today" : a.date === tomorrow ? "Tomorrow" : null;
+  const requestAction = (label: string, data: Partial<Appointment>) => setPendingAction({ label, data });
 
   const takenTimes = appointments
     .filter((x) => x.date === newDate && x.id !== a.id && x.status !== "cancelled")
@@ -199,68 +220,78 @@ const AppointmentCard = memo(function AppointmentCard({ a, role, isSelf, actor }
   async function confirmReschedule() {
     if (!newDate || !newTime) return;
     setRescheduleError("");
-    if (isSlotTooSoon(newDate, newTime)) {
-      setRescheduleError("New schedule must be at least 1 hour from now.");
-      return;
-    }
+    if (isSlotTooSoon(newDate, newTime)) { setRescheduleError("New schedule must be at least 1 hour from now."); return; }
     setSaving(true);
-    try {
-      await appointmentsService.rescheduleAndNotify(a.id, newDate, newTime, actor);
-      setRescheduling(false);
-    } catch (err: any) {
-      setRescheduleError(err.message || "Reschedule failed.");
-    } finally {
-      setSaving(false);
-    }
+    try { await appointmentsService.rescheduleAndNotify(a.id, newDate, newTime, actor); setRescheduling(false); }
+    catch (err: any) { setRescheduleError(err.message || "Reschedule failed."); }
+    finally { setSaving(false); }
   }
 
   const canReschedule = isSelf && !a.rescheduledAt && (a.status === "pending" || a.status === "confirmed");
 
+  const STATUS_LABELS: Record<string, string> = {
+    confirmed: "Confirm this appointment?",
+    "in-progress": "Mark appointment as In Progress?",
+    completed: "Mark appointment as Completed?",
+    "no-show": "Mark patient as No Show?",
+  };
+
   return (
-    <Card>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          {role !== "patient" && <p className="font-semibold text-gold-100 text-sm">{a.patientName}</p>}
-          <p className="text-gold-100/80 font-medium text-sm">{a.serviceName}</p>
-          <p className="text-xs text-gold-100/55 mt-0.5">{a.date} · {formatTime12h(a.time)} · {a.doctor}</p>
-          {a.source && a.source !== "online" && (
-            <p className="text-[10px] text-gold-300/50 mt-0.5 uppercase tracking-wider">via {a.source}</p>
-          )}
-          {a.calendarEventId && (
-            <p className="text-[10px] text-gold-300/50 mt-0.5">Synced to Google Calendar</p>
-          )}
+    <div className="space-y-3">
+      {/* Confirmation modal for status actions */}
+      {pendingAction && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <button className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setPendingAction(null)} />
+          <div className="relative glass-strong rounded-2xl p-6 max-w-sm w-full shadow-luxe space-y-4 text-center">
+            <div className="w-12 h-12 mx-auto rounded-full bg-gold-500/15 border border-gold-500/30 flex items-center justify-center text-2xl">✓</div>
+            <h3 className="font-serif text-xl text-gold-shine">{STATUS_LABELS[pendingAction.data.status as string] ?? "Confirm action?"}</h3>
+            <p className="text-sm text-gold-100/60">
+              Patient: <span className="text-gold-200 font-medium">{a.patientName}</span><br />
+              Service: <span className="text-gold-200 font-medium">{a.serviceName}</span><br />
+              Date: <span className="text-gold-200 font-medium">{a.date} at {formatTime12h(a.time)}</span>
+            </p>
+            <div className="flex gap-3 justify-center">
+              <Button onClick={() => { update(pendingAction.data); setPendingAction(null); }}>Confirm</Button>
+              <Button variant="ghost" onClick={() => setPendingAction(null)}>Cancel</Button>
+            </div>
+          </div>
         </div>
-        <div className="flex flex-wrap gap-2 items-center">
-          {reminderBadge && (a.status === "pending" || a.status === "confirmed") && (
-            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${reminderBadge === "Today" ? "bg-red-500/20 text-red-300 border border-red-500/30" : "bg-yellow-500/20 text-yellow-300 border border-yellow-500/30"}`}>
-              {reminderBadge}
-            </span>
-          )}
-          {a.emergency && <Badge tone="emergency">Priority</Badge>}
-          <Badge tone={a.status === "in-progress" ? "confirmed" : a.status === "no-show" ? "cancelled" : a.status === "rescheduled" ? "pending" : a.status as any}>{a.status}</Badge>
-          <PaymentBadge status={a.paymentStatus} method={a.paymentMethod === "gcash" ? "GCash" : ""} />
-        </div>
+      )}
+
+      {/* Extra info */}
+      <div className="flex flex-wrap gap-4 text-xs text-gold-100/55">
+        {a.source && a.source !== "online" && <span>Source: <span className="text-gold-300 capitalize">{a.source}</span></span>}
+        {a.status === "confirmed" || a.status === "in-progress" || a.status === "completed" ? (
+          <span>Confirmed by: <span className="text-emerald-300">Staff / Doctor</span></span>
+        ) : null}
+        {a.notes && <span>Notes: <span className="text-gold-100/70">{a.notes}</span></span>}
+        {a.receiptNumber && <span>Receipt: <span className="text-gold-300 font-mono">{a.receiptNumber}</span></span>}
+        {a.calendarEventId && <span className="text-gold-300/50">Synced to Google Calendar</span>}
       </div>
 
       {actionError && (
-        <p className="mt-2 text-xs text-red-300 bg-red-500/10 border border-red-500/20 rounded px-2 py-1">{actionError}</p>
+        <p className="text-xs text-red-300 bg-red-500/10 border border-red-500/20 rounded px-2 py-1">{actionError}</p>
       )}
 
-      <div className="mt-3 flex flex-wrap gap-2">
+      {/* Action buttons — all go through confirmation modal */}
+      <div className="flex flex-wrap gap-2">
         {(role === "doctor" || role === "admin") && a.status === "pending" && (
-          <Button size="sm" onClick={() => update({ status: "confirmed" })}>Confirm</Button>
+          <Button size="sm" onClick={() => requestAction("Confirm", { status: "confirmed" })}>Confirm</Button>
         )}
         {(role === "doctor" || role === "admin") && a.status === "confirmed" && (
-          <Button size="sm" onClick={() => update({ status: "in-progress" })}>Start</Button>
+          <Button size="sm" onClick={() => requestAction("Start", { status: "in-progress" })}>Start</Button>
         )}
         {(role === "doctor" || role === "admin") && a.status === "in-progress" && (
-          <Button size="sm" onClick={() => update({ status: "completed" })}>Complete</Button>
+          <Button size="sm" onClick={() => requestAction("Complete", { status: "completed" })}>Complete</Button>
         )}
         {(role === "doctor" || role === "admin") && (a.status === "confirmed" || a.status === "in-progress") && (
-          <Button size="sm" variant="ghost" onClick={() => update({ status: "no-show" })}>No Show</Button>
+          <Button size="sm" variant="ghost" onClick={() => requestAction("No Show", { status: "no-show" })}>No Show</Button>
         )}
         {role === "staff" && a.status === "pending" && (
-          <Button size="sm" onClick={() => update({ status: "confirmed" })}>Confirm</Button>
+          <Button size="sm" onClick={() => requestAction("Confirm", { status: "confirmed" })}>Confirm</Button>
+        )}
+        {(role === "admin" || role === "doctor" || role === "staff") && (
+          <Button size="sm" variant="danger" onClick={() => setConfirmDelete(true)}>Delete</Button>
         )}
         {role === "patient" && isSelf && (a.status === "pending" || a.status === "confirmed") && (
           canReschedule ? (
@@ -277,23 +308,20 @@ const AppointmentCard = memo(function AppointmentCard({ a, role, isSelf, actor }
       </div>
 
       {rescheduling && (
-        <div className="mt-4 p-4 rounded-xl border border-gold-500/20 bg-ink-900/50 space-y-3">
+        <div className="p-4 rounded-xl border border-gold-500/20 bg-ink-900/50 space-y-3">
           <p className="text-xs uppercase tracking-wider text-gold-300/60">Pick a new date & time</p>
           <div className="flex flex-wrap gap-3">
             <Input type="date" value={newDate} min={new Date().toISOString().slice(0, 10)}
               onChange={(e) => { setNewDate(e.target.value); setNewTime(""); setRescheduleError(""); }}
-              className="max-w-[160px]"
-              aria-label="New date"
-            />
+              className="max-w-[160px]" aria-label="New date" />
             <div className="flex flex-wrap gap-2" role="group" aria-label="Available time slots">
-              {BOOKING.TIME_SLOTS.map((t) => {
+              {getSlotsForDate(newDate).map((t) => {
                 const taken = takenTimes.includes(t);
                 const tooSoon = isSlotTooSoon(newDate, t);
                 const disabled = taken || tooSoon;
                 return (
                   <button key={t} disabled={disabled} onClick={() => { setNewTime(t); setRescheduleError(""); }}
                     aria-pressed={newTime === t}
-                    aria-label={`${t}${taken ? " (taken)" : tooSoon ? " (too soon)" : ""}`}
                     className={`px-3 py-1.5 rounded-lg text-xs border transition ${newTime === t ? "bg-gold-gradient text-ink-950 border-gold-400" : disabled ? "border-red-500/30 text-red-400/40 line-through cursor-not-allowed" : "border-gold-500/30 text-gold-100/80 hover:border-gold-400"}`}>
                     {t}
                   </button>
@@ -311,20 +339,29 @@ const AppointmentCard = memo(function AppointmentCard({ a, role, isSelf, actor }
       <ConfirmDialog
         open={confirmCancel}
         title="Cancel Appointment"
-        message={`Are you sure you want to cancel your ${a.serviceName} appointment on ${a.date} at ${formatTime12h(a.time)}? This cannot be undone. Note: repeated cancellations may affect future bookings.`}
+        message={`Are you sure you want to cancel your ${a.serviceName} appointment on ${a.date} at ${formatTime12h(a.time)}? This cannot be undone.`}
         confirmLabel="Yes, Cancel"
         danger
         onConfirm={() => { setConfirmCancel(false); appointmentsService.cancelAndNotify(a.id, actor); }}
         onCancel={() => setConfirmCancel(false)}
       />
 
-      {/* Status timeline — visible to patients */}
+      <ConfirmDialog
+        open={confirmDelete}
+        title="Delete Appointment"
+        message={`Permanently delete the ${a.serviceName} appointment for ${a.patientName} on ${a.date} at ${formatTime12h(a.time)}? This cannot be undone.`}
+        confirmLabel="Yes, Delete"
+        danger
+        onConfirm={() => { setConfirmDelete(false); appointmentsService.delete(a.id, actor); }}
+        onCancel={() => setConfirmDelete(false)}
+      />
+
       {role === "patient" && a.status !== "cancelled" && (
         <AppointmentTimeline status={a.status} paymentStatus={a.paymentStatus} />
       )}
-    </Card>
+    </div>
   );
-});
+}
 
 export function AppointmentTimeline({ status, paymentStatus }: { status: AppointmentStatus; paymentStatus: PaymentStatus }) {
   const steps = [
@@ -366,17 +403,11 @@ export function AppointmentTimeline({ status, paymentStatus }: { status: Appoint
 }
 
 export function PaymentBadge({ status, method }: { status: PaymentStatus; method: string }) {
-  const map: Record<PaymentStatus, { tone: any; text: string }> = {
-    unpaid:               { tone: "neutral", text: "Unpaid" },
-    partial_paid:         { tone: "pending", text: "Partial" },
-    pending_verification: { tone: "pending", text: "Pending" },
-    verified:             { tone: "confirmed", text: "Verified" },
-    paid:                 { tone: "paid",    text: "Paid" },
-  };
-  const s = map[status] || { tone: "neutral", text: status };
   return (
     <div className="flex flex-col items-start gap-0.5">
-      <Badge tone={s.tone}>{s.text}</Badge>
+      <Badge tone={status === "paid" ? "paid" : "neutral"}>
+        {status === "paid" ? "Paid" : "Unpaid"}
+      </Badge>
       {status === "paid" && method && <span className="text-[10px] text-gold-100/45">{method}</span>}
     </div>
   );

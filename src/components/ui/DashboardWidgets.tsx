@@ -218,10 +218,9 @@ export function AppointmentActionRow({ appt: a }: { appt: Appointment }) {
         </div>
       </div>
       <div className="flex items-center gap-2 shrink-0 flex-wrap">
-        {a.emergency && <Badge tone="emergency">Priority</Badge>}
         <Badge tone={a.status as any}>{a.status}</Badge>
         <Badge tone={a.paymentStatus === "paid" ? "paid" : "neutral"}>
-          {a.paymentStatus === "paid" ? `Paid · ${a.paymentMethod === "gcash" ? "GCash" : "Cash"}` : "Unpaid"}
+          {a.paymentStatus === "paid" ? "Paid · Cash" : "Unpaid"}
         </Badge>
         {nextActions.map(({ label, status }) => (
           <button key={status} disabled={!!updating} onClick={() => setStatus(status)}
@@ -279,6 +278,52 @@ function DayCell({ d, todayStr, appointments, onTabChange }: {
         <div className="text-[9px] text-gold-100/20 mt-1">—</div>
       )}
     </button>
+  );
+}
+
+// ── Today's Summary widget (panel requirement: daily clients + revenue on dashboard) ──
+export function TodaySummaryWidget({ appointments, onTabChange }: {
+  appointments: Appointment[];
+  onTabChange: (t: string) => void;
+}) {
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayAppts = appointments.filter((a) => a.date === todayStr && a.status !== "cancelled");
+  const completed  = todayAppts.filter((a) => a.status === "completed").length;
+  const pending    = todayAppts.filter((a) => a.status === "pending").length;
+  const confirmed  = todayAppts.filter((a) => a.status === "confirmed" || a.status === "in-progress").length;
+  const revenue    = todayAppts.filter((a) => a.paymentStatus === "paid").reduce((s, a) => s + a.price, 0);
+  const unpaid     = todayAppts.filter((a) => a.status === "completed" && a.paymentStatus !== "paid").length;
+
+  return (
+    <div className="glass-strong rounded-xl p-5">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <p className="text-[10px] uppercase tracking-[0.26em] text-gold-300/55">Today's Summary</p>
+          <p className="text-xs text-gold-100/40">{todayStr}</p>
+        </div>
+        <button onClick={() => onTabChange("appointments")} className="text-xs text-gold-400/60 hover:text-gold-300 transition">View all →</button>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        {[
+          { label: "Total Clients",  value: todayAppts.length, color: "text-blue-300",    tab: "appointments" },
+          { label: "Revenue Today",  value: `₱${revenue.toLocaleString()}`, color: "text-gold-shine", tab: "payments" },
+          { label: "Completed",      value: completed,          color: "text-emerald-300", tab: "appointments" },
+          { label: "Pending",        value: pending + confirmed, color: "text-amber-300",  tab: "appointments" },
+        ].map((s) => (
+          <button key={s.label} onClick={() => onTabChange(s.tab)}
+            className="rounded-lg border border-gold-500/15 bg-ink-900/40 p-3 text-left hover:border-gold-400/30 transition">
+            <div className="text-[9px] uppercase tracking-wider text-gold-300/50 mb-0.5">{s.label}</div>
+            <div className={`font-serif text-xl ${s.color}`}>{s.value}</div>
+          </button>
+        ))}
+      </div>
+      {unpaid > 0 && (
+        <button onClick={() => onTabChange("payments")}
+          className="mt-3 w-full text-xs text-amber-300 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2 text-left hover:bg-amber-500/15 transition">
+          ⚠ {unpaid} completed appointment{unpaid !== 1 ? "s" : ""} with unpaid balance
+        </button>
+      )}
+    </div>
   );
 }
 

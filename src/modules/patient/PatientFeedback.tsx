@@ -19,7 +19,6 @@ export function PatientFeedback() {
     if (submitting) return;
     if (!text.trim()) { setFormError("Please write a comment before submitting."); return; }
     if (text.trim().length < 10) { setFormError("Comment must be at least 10 characters."); return; }
-    if (completed.length > 0 && !appointmentId) { setFormError("Please select the appointment this feedback is for."); return; }
     if (appointmentId && mine.some((f) => f.appointmentId === appointmentId)) {
       setFormError("You have already submitted feedback for this appointment."); return;
     }
@@ -28,24 +27,6 @@ export function PatientFeedback() {
       await feedbackService.submit({ userId: user!.id, userName: user!.name, stars, text: text.trim(), appointmentId: appointmentId || undefined });
       setSent(true); setText(""); setStars(5); setAppointmentId(completed[0]?.id || "");
     } finally { setSubmitting(false); }
-  }
-
-  if (completed.length === 0) {
-    return (
-      <div className="grid xl:grid-cols-[0.9fr_1.1fr] gap-6">
-        <Card>
-          <h3 className="font-serif text-2xl text-gold-gradient">Submit Feedback</h3>
-          <div className="mt-6 rounded-xl border border-gold-500/20 bg-ink-900/40 p-6 text-center">
-            <p className="text-sm text-gold-100/60">Feedback is available after your first completed appointment.</p>
-            <p className="text-xs text-gold-100/40 mt-1">Complete a visit to share your experience.</p>
-          </div>
-        </Card>
-        <Card>
-          <h3 className="font-serif text-2xl text-gold-gradient">Your Previous Feedback</h3>
-          <div className="mt-5"><p className="text-sm text-gold-100/50">No feedback submitted yet.</p></div>
-        </Card>
-      </div>
-    );
   }
 
   return (

@@ -10,7 +10,6 @@ import type {
   StaffPermission,
   User,
   Announcement,
-  WaitlistEntry,
 } from "../shared/types";
 
 export interface ToastEntry {
@@ -33,7 +32,6 @@ export interface AppState {
   staffPermissions: StaffPermission[];
   announcements: Announcement[];
   toasts: ToastEntry[];
-  waitlist: WaitlistEntry[];
   doctorSchedules: DoctorSchedule[];
 }
 
@@ -51,7 +49,6 @@ const INITIAL_STATE: AppState = {
   staffPermissions: [],
   announcements: [],
   toasts: [],
-  waitlist: [],
   doctorSchedules: [],
 };
 

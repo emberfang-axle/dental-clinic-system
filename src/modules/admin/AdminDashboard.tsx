@@ -1,11 +1,9 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { Button, Input, Card, EmptyState } from "../../components/ui";
-import { AlertBanner, WeeklyMiniCalendar, RevenueSparkline, AppointmentActionRow, StatGrid } from "../../components/ui/DashboardWidgets";
+import { AlertBanner, WeeklyMiniCalendar, RevenueSparkline, AppointmentActionRow, StatGrid, TodaySummaryWidget } from "../../components/ui/DashboardWidgets";
 import { useStore } from "../../store/store";
 import { ROUTES, DASHBOARD_TABS } from "../../shared/constants";
 import { today, thisMonth, plural } from "../../shared/helpers";
-import { settingsService } from "../../services/settings";
-import { uploadFile } from "../../services/upload";
 import { DashboardLayout } from "../../components/layout/DashboardLayout";
 import { AppointmentsList } from "../appointment/AppointmentsList";
 import { ClinicalRecords } from "../doctor/ClinicalRecords";
@@ -107,6 +105,17 @@ function AdminOverview({ onTabChange }: { onTabChange: (t: string) => void }) {
         )}
       </div>
 
+      {/* Generate Report button — panel requirement */}
+      <div className="flex justify-end">
+        <button
+          onClick={() => onTabChange("reports")}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gold-500/30 bg-gold-500/10 text-gold-200 text-sm font-medium hover:bg-gold-500/20 hover:border-gold-400/50 transition"
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+          Generate Report
+        </button>
+      </div>
+
       <StatGrid onTabChange={onTabChange} stats={[
         { label: "Today",      value: todayCount,                          sub: `${pendingCount} pending`,                      tab: "appointments", color: "text-blue-300" },
         { label: "This Month", value: `₱${monthRevenue.toLocaleString()}`, sub: `₱${allRevenue.toLocaleString()} all-time`,      tab: "payments",     color: "text-gold-shine" },
@@ -136,6 +145,7 @@ function AdminOverview({ onTabChange }: { onTabChange: (t: string) => void }) {
         </div>
 
         <div className="space-y-6">
+          <TodaySummaryWidget appointments={appointments} onTabChange={onTabChange} />
           {topServices.length > 0 && (
             <div>
               <h2 className="font-serif text-xl text-gold-shine mb-3">Top Services</h2>
@@ -227,85 +237,26 @@ function RecentPatients({ onTabChange }: { onTabChange: (t: string) => void }) {
 }
 
 function SystemIntegrationStatus() {
-  const { appointments, settings } = useStore();
+  const { appointments } = useStore();
   const withCalendar = appointments.filter((a) => a.calendarEventId).length;
   const total = appointments.filter((a) => a.status !== "cancelled").length;
-  const [qrUploading, setQrUploading] = useState(false);
-  const [gcashNum, setGcashNum] = useState(settings?.gcashNumber ?? "");
-  const [gcashSaving, setGcashSaving] = useState(false);
-  const [gcashSaved, setGcashSaved] = useState(false);
-
-  // Sync gcashNum when settings load from Firestore
-  useEffect(() => {
-    setGcashNum(settings?.gcashNumber ?? "");
-  }, [settings?.gcashNumber]);
 
   const integrations = [
     { name: "Email Notifications", description: "Booking confirmations, reminders & payment receipts via Resend API", triggers: ["On appointment created", "On confirmed / completed / cancelled", "Daily 8AM reminder for tomorrow's patients"] },
     { name: "SMS Notifications", description: "Real-time SMS alerts via Semaphore API (Philippine numbers)", triggers: ["On appointment created", "On confirmed / completed / cancelled / rescheduled", "On payment confirmed"] },
     { name: "Google Calendar Sync", description: "Auto-creates and deletes calendar events on booking/cancellation", triggers: ["On appointment created → event added", "On appointment cancelled → event deleted"], stat: total > 0 ? `${withCalendar}/${total} appointments synced` : "Ready" },
-    { name: "Firestore Security Rules", description: "Server-side access control — patients cannot escalate their own appointment status or forge payments", triggers: ["Patients: create pending only, cancel/reschedule/submit GCash proof", "Staff/Doctor: full appointment management"] },
+    { name: "Firestore Security Rules", description: "Server-side access control — patients cannot escalate their own appointment status or forge payments", triggers: ["Patients: create pending only, cancel/reschedule", "Staff/Doctor: full appointment management"] },
   ];
 
   const roles = [
     { title: "Patient",        color: "text-gold-300",   can: ["Book & manage own appointments", "View treatment records & invoices", "Submit feedback"] },
-    { title: "Staff",          color: "text-amber-300",  can: ["Manage queue & appointments", "Verify payments", "View permitted records"] },
+    { title: "Staff",          color: "text-amber-300",  can: ["Manage queue & appointments", "Record cash payments", "View permitted records"] },
     { title: "Co-Doctor",      color: "text-purple-300", can: ["View assigned patients", "Add treatment notes", "Access clinical records"] },
     { title: "Admin / Doctor", color: "text-blue-300",   can: ["Full system access", "Manage all accounts", "Analytics & audit logs"] },
   ];
 
   return (
     <div className="space-y-8 max-w-2xl">
-      <div>
-        <h2 className="font-serif text-2xl text-gold-shine mb-1">GCash Payment Settings</h2>
-        <p className="text-sm text-gold-100/60 mb-4">Upload the clinic's GCash QR code and number so patients can scan and pay directly.</p>
-        <div className="glass-strong rounded-xl p-5">
-          <div className="flex flex-col sm:flex-row gap-6 items-start">
-            <div className="shrink-0">
-              {settings?.gcashQrUrl ? (
-                <img src={settings.gcashQrUrl} alt="GCash QR" className="w-36 h-36 object-contain rounded-xl border border-gold-500/20" />
-              ) : (
-                <div className="w-36 h-36 rounded-xl border border-dashed border-gold-500/30 bg-ink-900/50 flex items-center justify-center text-gold-100/30 text-xs text-center px-3">No QR uploaded yet</div>
-              )}
-              <label className="mt-2 block">
-                <span className="text-xs text-gold-300 hover:text-gold-100 cursor-pointer underline transition">
-                  {qrUploading ? "Uploading…" : "Upload QR Image"}
-                </span>
-                <input type="file" accept="image/*" className="hidden" disabled={qrUploading}
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0]; if (!file) return;
-                    setQrUploading(true);
-                    try {
-                      const url = await uploadFile(file, `clinic/gcash-qr.${file.name.split(".").pop()}`);
-                      await settingsService.updateClinic({ gcashQrUrl: url }, "admin");
-                    } finally { setQrUploading(false); }
-                  }} />
-              </label>
-            </div>
-            <div className="flex-1 space-y-3">
-              <div>
-                <label className="text-xs uppercase tracking-wider text-gold-300/60 block mb-1">GCash Number</label>
-                <div className="flex gap-2">
-                  <input value={gcashNum} onChange={(e) => { setGcashNum(e.target.value); setGcashSaved(false); }} placeholder="e.g. 09XXXXXXXXX"
-                    className="flex-1 rounded-md bg-ink-900/60 border border-gold-500/15 px-4 py-3 text-gold-50 placeholder:text-gold-100/25 text-sm focus:outline-none focus:border-gold-400/60 transition" />
-                  <Button size="sm" disabled={gcashSaving} onClick={async () => {
-                    setGcashSaving(true); setGcashSaved(false);
-                    try {
-                      await settingsService.updateClinic({ gcashNumber: gcashNum }, "admin");
-                      setGcashSaved(true);
-                      setTimeout(() => setGcashSaved(false), 3000);
-                    } finally { setGcashSaving(false); }
-                  }}>
-                    {gcashSaving ? "Saving…" : gcashSaved ? "Saved" : "Save"}
-                  </Button>
-                </div>
-              </div>
-              <p className="text-xs text-gold-100/40 leading-relaxed">Patients will see this QR code and number when submitting GCash payment proof.</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <div>
         <h2 className="font-serif text-2xl text-gold-shine mb-1">System Integrations</h2>
         <p className="text-sm text-gold-100/60 mb-5">All backend functions are deployed on Firebase Cloud Functions and trigger automatically.</p>

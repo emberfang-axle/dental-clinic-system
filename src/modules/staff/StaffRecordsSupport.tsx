@@ -90,7 +90,6 @@ export function StaffRecordsSupport() {
 
         <div className="mt-3 flex items-center gap-2 flex-wrap">
           <Badge tone={selected.status as any}>{selected.status}</Badge>
-          {selected.emergency && <Badge tone="emergency">Emergency</Badge>}
         </div>
       </Card>
 
@@ -117,7 +116,7 @@ export function StaffRecordsSupport() {
         <div className="mt-4">
           <Label>Staff Support Note</Label>
           <Textarea rows={8} value={supportNote} onChange={(e) => setSupportNote(e.target.value)}
-            placeholder="e.g. Patient arrived early, chart prepared, GCash ref checked, doctor informed…" />
+            placeholder="e.g. Patient arrived early, chart prepared, doctor informed…" />
         </div>
 
         <div className="mt-5 flex flex-wrap items-center gap-3">

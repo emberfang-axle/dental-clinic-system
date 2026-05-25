@@ -268,7 +268,7 @@ export function LandingPage({ navigate }: { navigate: (p: string) => void }) {
               {
                 // Shield with checkmark — secure payments
                 icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>,
-                t: "Secure Payments", d: "Pay with GCash or cash, with verified transaction tracking."
+                t: "Secure Records", d: "Your patient records and treatment history are safely stored and accessible anytime."
               },
               {
                 // Clock with calendar dot — real-time scheduling
@@ -484,7 +484,7 @@ export function LandingPage({ navigate }: { navigate: (p: string) => void }) {
                 Ready for your <span className="font-script italic">next visit?</span>
               </h2>
               <p className="mt-4 sm:mt-6 text-gold-100/70 max-w-xl mx-auto text-sm sm:text-lg font-light">
-                Schedule your appointment in minutes. Pay securely online or at the clinic.
+                Schedule your appointment in minutes and experience world-class dental care.
               </p>
               <div className="mt-8 sm:mt-10 flex flex-col sm:flex-row justify-center gap-3">
                 <Button size="lg" onClick={() => navigate(ROUTES.book)} className="w-full sm:w-auto">Book Appointment</Button>

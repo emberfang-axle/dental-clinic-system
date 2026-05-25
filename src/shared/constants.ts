@@ -17,7 +17,14 @@ export const CLINIC = {
 
 export const BOOKING = {
   TIME_SLOTS: ["09:00", "10:00", "11:00", "13:00", "14:00", "15:00", "16:00"] as const,
+  SATURDAY_SLOTS: ["08:00", "09:00", "10:00", "11:00", "13:00", "14:00", "15:00", "16:00"] as const,
 };
+
+/** Returns the correct time slots for a given date (Saturday gets 08:00 start). */
+export function getSlotsForDate(dateStr: string): readonly string[] {
+  const day = new Date(dateStr + "T00:00:00").getDay();
+  return day === 6 ? BOOKING.SATURDAY_SLOTS : BOOKING.TIME_SLOTS;
+}
 
 /** Sidebar tabs per role — used by DashboardLayout.
  *  Each list: pinned-first items → alphabetical middle → pinned-last items.

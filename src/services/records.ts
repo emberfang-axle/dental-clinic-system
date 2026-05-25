@@ -48,8 +48,6 @@ export type TreatmentForm = Pick<
   | "treatmentPlan"
   | "dentalHistory"
   | "notes"
-  | "beforeImageUrl"
-  | "afterImageUrl"
 >;
 
 export const recordsService = {

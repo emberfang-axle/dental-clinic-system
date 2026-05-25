@@ -101,7 +101,7 @@ export function Textarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
     <textarea
       {...props}
       className={cn(
-        "w-full rounded-md bg-ink-900/60 border border-gold-500/15 px-4 py-3 text-gold-50 placeholder:text-gold-100/25 text-sm",
+        "w-full rounded-md bg-ink-900/60 border border-gold-500/15 px-4 py-3 text-gold-50 placeholder:text-gold-100/25 text-sm resize-none",
         "focus:outline-none focus:border-gold-400/60 focus:ring-2 focus:ring-gold-400/20 focus:bg-ink-900 transition",
         props.className,
       )}

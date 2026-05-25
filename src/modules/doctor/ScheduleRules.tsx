@@ -11,8 +11,6 @@ const DEFAULT_SETTINGS: ClinicSettings = {
   workingHoursEnd: "17:00",
   bookingInterval: 60,
   maxAppointmentsPerDay: 7,
-  allowEmergencyPriority: true,
-  gcashNumber: "",
   bookingRules: "",
 };
 
@@ -77,22 +75,9 @@ export function ScheduleRules() {
         </div>
 
         <div className="mt-4">
-          <Label>Clinic GCash Number</Label>
-          <Input value={form.gcashNumber || ""} onChange={(e) => setForm((p) => ({ ...p, gcashNumber: e.target.value }))} placeholder="e.g. 09107614956" />
+          <Label>Booking Rules</Label>
+          <Textarea rows={4} value={form.bookingRules || ""} onChange={(e) => setForm((p) => ({ ...p, bookingRules: e.target.value }))} placeholder="e.g. Arrive 10 minutes early. Payment is collected after treatment." />
         </div>
-
-        <div className="mt-4">
-          <Label>Booking & Payment Rules</Label>
-          <Textarea rows={4} value={form.bookingRules || ""} onChange={(e) => setForm((p) => ({ ...p, bookingRules: e.target.value }))} placeholder="e.g. Arrive 10 minutes early. GCash payment must be submitted within 24 hours." />
-        </div>
-
-        <label className="mt-5 flex items-center gap-3 rounded-xl border border-gold-500/15 bg-ink-900/50 p-4 cursor-pointer">
-          <input type="checkbox" checked={!!form.allowEmergencyPriority} onChange={(e) => setForm((p) => ({ ...p, allowEmergencyPriority: e.target.checked }))} className="h-4 w-4 accent-[#d4af37]" />
-          <div>
-            <div className="text-sm font-medium text-gold-100">Allow emergency / priority overrides</div>
-            <div className="text-xs text-gold-100/50">Doctor can insert urgent appointments ahead of regular queue slots.</div>
-          </div>
-        </label>
 
         <div className="mt-5 flex items-center gap-3 flex-wrap">
           <Button onClick={async () => { await settingsService.updateClinic(form, user!.name); setSaved(true); setTimeout(() => setSaved(false), 3000); }}>

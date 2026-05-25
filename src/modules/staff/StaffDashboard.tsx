@@ -1,10 +1,10 @@
 import { useState, useMemo } from "react";
-import { Button, Badge } from "../../components/ui";
+import { Button } from "../../components/ui";
 import { StatGrid, TodaySchedule, AlertBanner, WeeklyMiniCalendar } from "../../components/ui/DashboardWidgets";
 import { DashboardLayout } from "../../components/layout/DashboardLayout";
 import { useStore } from "../../store/store";
 import { DASHBOARD_TABS } from "../../shared/constants";
-import { today, plural } from "../../shared/helpers";
+import { today, plural, formatTime12h } from "../../shared/helpers";
 import { AppointmentsList } from "../appointment/AppointmentsList";
 import { NotificationsCenter, PaymentsPage, ProfilePage } from "../shared/SharedModules";
 import { StaffQueue } from "./StaffQueue";
@@ -50,25 +50,6 @@ export function StaffDashboard({ navigate }: { navigate: (p: string) => void }) 
     </DashboardLayout>
   );
 }
-
-function formatTime12h(time: string) {
-  if (!time) return "";
-
-  const [hours, minutes] = time.split(":").map(Number);
-
-  return new Date(
-    0,
-    0,
-    0,
-    hours,
-    minutes
-  ).toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
-}
-
 
 function StaffOverview({ onTabChange }: { onTabChange: (t: string) => void }) {
   const { appointments } = useStore();
@@ -168,7 +149,6 @@ function StaffOverview({ onTabChange }: { onTabChange: (t: string) => void }) {
                       <p className="text-sm font-medium text-gold-100 truncate">{a.patientName}</p>
                       <p className="text-xs text-gold-100/45">{formatTime12h(a.time)} · {a.serviceName}</p>
                     </div>
-                    {a.emergency && <Badge tone="emergency">!</Badge>}
                   </div>
                 ))}
                 {confirmedList.length > 5 && (

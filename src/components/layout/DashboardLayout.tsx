@@ -31,11 +31,11 @@ export function DashboardLayout({ user, tabs, activeTab, onTabChange, navigate, 
   const currentLabel = tabs.find((t) => t.id === activeTab)?.label || "Dashboard";
 
   return (
-    <div className="min-h-screen bg-ink-950 flex relative">
+    <div className="h-screen overflow-hidden bg-ink-950 flex relative">
       <div className="absolute top-0 right-0 w-[520px] h-[520px] bg-gold-600/8 rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute bottom-0 left-0 w-[420px] h-[420px] bg-gold-500/6 rounded-full blur-[120px] pointer-events-none" />
 
-      <aside className="hidden lg:flex w-60 border-r border-gold-soft bg-ink-900/70 backdrop-blur-xl flex-col relative z-10">
+      <aside className="hidden lg:flex w-60 border-r border-gold-soft bg-ink-900/70 backdrop-blur-xl flex-col relative z-10 h-screen sticky top-0">
         <DesktopSidebar user={user} tabs={tabs} activeTab={activeTab} onTabChange={onTabChange} navigate={navigate} unread={unread} />
       </aside>
 
@@ -99,16 +99,24 @@ function DesktopSidebar({ user, tabs, activeTab, onTabChange, navigate, unread }
   user: User; tabs: DashboardTab[]; activeTab: string; unread: number;
   onTabChange: (id: string) => void; navigate: (p: string) => void;
 }) {
+  // Separate nav tabs from pinned-bottom items
+  const bottomIds = new Set(["profile", "settings"]);
+  const navTabs = tabs.filter((t) => !bottomIds.has(t.id));
+  const bottomTabs = tabs.filter((t) => bottomIds.has(t.id));
+
   return (
-    <>
-      <div className="p-4 border-b border-gold-soft">
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* Logo */}
+      <div className="p-4 border-b border-gold-soft shrink-0">
         <button onClick={() => navigate(ROUTES.home)} className="hover:opacity-80 transition" aria-label="Go to home">
           <Logo size={32} />
         </button>
+        <div className="mt-2 text-[9px] uppercase tracking-[0.2em] text-gold-300/50">{roleLabel(user.role)}</div>
       </div>
 
-      <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto overscroll-contain" aria-label="Dashboard navigation">
-        {tabs.map((t) => {
+      {/* Scrollable nav */}
+      <nav className="flex-1 overflow-y-auto overscroll-contain p-2 space-y-0.5 min-h-0" aria-label="Dashboard navigation">
+        {navTabs.map((t) => {
           const isActive = activeTab === t.id;
           const badge = t.id === "notifications" && unread > 0 ? unread : 0;
           return (
@@ -132,9 +140,23 @@ function DesktopSidebar({ user, tabs, activeTab, onTabChange, navigate, unread }
         })}
       </nav>
 
-      <div className="p-2 border-t border-gold-soft space-y-1">
+      {/* Pinned bottom */}
+      <div className="p-2 border-t border-gold-soft space-y-1 shrink-0">
+        {bottomTabs.map((t) => {
+          const isActive = activeTab === t.id;
+          return (
+            <button key={t.id} onClick={() => onTabChange(t.id)}
+              aria-current={isActive ? "page" : undefined}
+              className={`w-full text-left px-4 py-2 rounded-xl text-xs font-medium transition-all flex items-center justify-between ${
+                isActive ? "bg-gold-500/15 text-gold-100 border border-gold-500/35" : "text-gold-100/50 hover:bg-gold-500/5 hover:text-gold-200 border border-transparent"
+              }`}>
+              <span className="truncate">{t.label}</span>
+              {isActive && <span className="ml-auto w-1 h-3 rounded-full bg-gold-400 shrink-0" />}
+            </button>
+          );
+        })}
+        {/* User profile row */}
         <button onClick={() => onTabChange("profile")}
-          aria-current={activeTab === "profile" ? "page" : undefined}
           className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border transition ${
             activeTab === "profile" ? "border-gold-500/35 bg-gold-500/10" : "border-gold-500/15 hover:bg-gold-500/5"
           }`}>
@@ -157,7 +179,7 @@ function DesktopSidebar({ user, tabs, activeTab, onTabChange, navigate, unread }
           Logout
         </Button>
       </div>
-    </>
+    </div>
   );
 }
 

@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button, Card, Input, Label, Textarea } from "../../components/ui";
 import { useStore } from "../../store/store";
 import { authService } from "../../services/auth";
+import { uploadFile } from "../../services/upload";
 import { initials, roleLabel } from "../../shared/helpers";
 import type { MedicalHistory } from "../../shared/types";
 
@@ -27,12 +28,29 @@ function ProfileCard() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (user) { setName(user.name); setPhone(user.phone || ""); setAddress(user.address || ""); }
   }, [user]);
 
   if (!user) return null;
+
+  async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setAvatarUploading(true);
+    try {
+      const url = await uploadFile(file, `avatars/${user!.id}.${file.name.split(".").pop()}`);
+      await authService.updateProfile(user!.id, { avatarUrl: url } as any, user!.name);
+    } catch (err: any) {
+      setError(err.message || "Failed to upload photo.");
+    } finally {
+      setAvatarUploading(false);
+      if (avatarInputRef.current) avatarInputRef.current.value = "";
+    }
+  }
 
   async function save() {
     if (!name.trim()) { setError("Name is required."); return; }
@@ -49,11 +67,29 @@ function ProfileCard() {
     }
   }
 
+  const avatarUrl = (user as any).avatarUrl as string | undefined;
+
   return (
     <Card>
       <div className="flex items-center gap-4 mb-6">
-        <div className="w-20 h-20 rounded-full bg-gold-gradient flex items-center justify-center text-ink-950 font-bold text-2xl shadow-gold shrink-0" aria-hidden="true">
-          {initials(user.name)}
+        <div className="relative shrink-0 group">
+          {avatarUrl ? (
+            <img src={avatarUrl} alt={user.name} className="w-20 h-20 rounded-full object-cover border-2 border-gold-500/30 shadow-gold" />
+          ) : (
+            <div className="w-20 h-20 rounded-full bg-gold-gradient flex items-center justify-center text-ink-950 font-bold text-2xl shadow-gold" aria-hidden="true">
+              {initials(user.name)}
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={() => avatarInputRef.current?.click()}
+            disabled={avatarUploading}
+            className="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white text-xs font-medium"
+            aria-label="Change profile photo"
+          >
+            {avatarUploading ? "…" : "Change"}
+          </button>
+          <input ref={avatarInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
         </div>
         <div className="min-w-0">
           <div className="text-2xl font-serif text-gold-gradient truncate">{user.name}</div>

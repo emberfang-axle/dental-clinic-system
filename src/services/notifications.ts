@@ -1,5 +1,5 @@
 import type { NotificationEntry, NotificationKind } from "../shared/types";
-import { addDocTyped, updateDocTyped } from "./firestore";
+import { addDocTyped, updateDocTyped, deleteDocTyped } from "./firestore";
 import { getSnapshot, setState } from "../store/store";
 
 function nowISO() { return new Date().toISOString(); }
@@ -41,5 +41,18 @@ export const notificationsService = {
     setState({
       notifications: snap.notifications.map((n) => n.userId === userId ? { ...n, read: true } : n),
     });
+  },
+
+  async delete(id: string) {
+    await deleteDocTyped("notifications", id);
+    const snap = getSnapshot();
+    setState({ notifications: snap.notifications.filter((n) => n.id !== id) });
+  },
+
+  async deleteAll(userId: string) {
+    const snap = getSnapshot();
+    const mine = snap.notifications.filter((n) => n.userId === userId);
+    await Promise.all(mine.map((n) => deleteDocTyped("notifications", n.id)));
+    setState({ notifications: snap.notifications.filter((n) => n.userId !== userId) });
   },
 };

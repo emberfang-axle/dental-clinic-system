@@ -1,9 +1,11 @@
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { Badge, Button, Card, EmptyState } from "../../components/ui";
 import { notificationsService } from "../../services/notifications";
 import { useStore } from "../../store/store";
 import { formatDateTime } from "../../shared/helpers";
 import type { Role, NotificationEntry } from "../../shared/types";
+
+const PAGE_SIZE = 10;
 
 export function NotificationsCenter() {
   const { notifications, announcements, user } = useStore() as {
@@ -11,6 +13,7 @@ export function NotificationsCenter() {
     announcements: any[];
     user: { id: string; name: string; role: Role } | null;
   };
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   if (!user) return null;
 
@@ -19,6 +22,7 @@ export function NotificationsCenter() {
     .sort((a, b) => b.at.localeCompare(a.at));
 
   const unreadCount = mine.filter((n) => !n.read).length;
+  const visible = mine.slice(0, visibleCount);
 
   const handleMarkRead = useCallback((id: string) => {
     notificationsService.markRead(id);
@@ -26,6 +30,14 @@ export function NotificationsCenter() {
 
   const handleMarkAllRead = useCallback(() => {
     notificationsService.markAllRead(user.id);
+  }, [user.id]);
+
+  const handleDelete = useCallback((id: string) => {
+    notificationsService.delete(id);
+  }, []);
+
+  const handleClearAll = useCallback(() => {
+    notificationsService.deleteAll(user.id);
   }, [user.id]);
 
   return (
@@ -46,6 +58,11 @@ export function NotificationsCenter() {
               Mark All as Read
             </Button>
           )}
+          {mine.length > 0 && (
+            <Button variant="danger" size="sm" onClick={handleClearAll}>
+              Clear All
+            </Button>
+          )}
         </div>
       </Card>
 
@@ -55,7 +72,7 @@ export function NotificationsCenter() {
             <EmptyState icon="—" title="No notifications yet" subtitle="You'll see appointment updates and reminders here." />
           </Card>
         )}
-        {mine.map((n) => (
+        {visible.map((n) => (
           <div key={n.id} role="listitem">
             <Card className={n.read ? "opacity-70" : "border-gold-500/30"}>
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -79,10 +96,24 @@ export function NotificationsCenter() {
                   Mark Read
                 </Button>
               )}
+              <button
+                onClick={() => handleDelete(n.id)}
+                aria-label="Delete notification"
+                className="text-gold-100/30 hover:text-red-400 transition text-lg leading-none shrink-0"
+              >
+                ✕
+              </button>
             </div>
           </Card>
           </div>
         ))}
+        {mine.length > visibleCount && (
+          <div className="text-center pt-2">
+            <Button variant="outline" size="sm" onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}>
+              Load More ({mine.length - visibleCount} remaining)
+            </Button>
+          </div>
+        )}
       </div>
 
       {announcements.length > 0 && (

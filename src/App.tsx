@@ -3,43 +3,20 @@ import { useStore } from "./store/store";
 import { canAccessRoute, dashboardPathFor } from "./shared/helpers";
 import { ROUTES } from "./shared/constants";
 import { LandingPage } from "./modules/landing/LandingPage";
-import { PrivacyPage } from "./modules/landing/PrivacyPage";
-import { TermsPage } from "./modules/landing/TermsPage";
 import { LoginPage, RegisterPage } from "./modules/auth/AuthPage";
 import { AdminLoginPage } from "./modules/auth/AdminLoginPage";
 import { BookAppointmentPage } from "./modules/appointment/BookAppointmentPage";
 import { AdminDashboard } from "./modules/admin/AdminDashboard";
 import { DoctorDashboard } from "./modules/doctor/DoctorDashboard";
-import { CoDoctorDashboard } from "./modules/doctor/CoDoctorDashboard";
 import { StaffDashboard } from "./modules/staff/StaffDashboard";
 import { PatientDashboard } from "./modules/patient/PatientDashboard";
 import { SetupPage } from "./modules/setup/SetupPage";
 import { NotFoundPage } from "./modules/shared/NotFoundPage";
 import { OfflineBanner } from "./components/OfflineBanner";
-import { ErrorBoundary } from "./components/ErrorBoundary";
-
-type Nav = { navigate: (p: string) => void };
-type PageMap = Record<string, (props: Nav) => React.ReactElement>;
-
-const PAGES: PageMap = {
-  [ROUTES.home]:             (p) => <LandingPage {...p} />,
-  [ROUTES.login]:            (p) => <LoginPage {...p} />,
-  [ROUTES.adminLogin]:       (p) => <AdminLoginPage {...p} />,
-  [ROUTES.register]:         (p) => <RegisterPage {...p} />,
-  [ROUTES.book]:             (p) => <BookAppointmentPage {...p} />,
-  "/setup":                  (p) => <SetupPage {...p} />,
-  "/privacy":                (p) => <PrivacyPage {...p} />,
-  "/terms":                  (p) => <TermsPage {...p} />,
-  [ROUTES.adminDashboard]:    (p) => <AdminDashboard {...p} />,
-  [ROUTES.doctorDashboard]:   (p) => <DoctorDashboard {...p} />,
-  [ROUTES.coDoctorDashboard]: (p) => <CoDoctorDashboard {...p} />,
-  [ROUTES.staffDashboard]:    (p) => <StaffDashboard {...p} />,
-  [ROUTES.patientDashboard]:  (p) => <PatientDashboard {...p} />,
-};
 
 export default function App() {
   const [path, setPath] = useState(() => window.location.hash.replace(/^#/, "") || ROUTES.home);
-  const { user, authReady, profileReady } = useStore();
+  const { user, authReady } = useStore();
 
   useEffect(() => {
     const onHash = () => setPath(window.location.hash.replace(/^#/, "") || ROUTES.home);
@@ -50,35 +27,41 @@ export default function App() {
   function navigate(p: string) {
     window.location.hash = p;
     setPath(p);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({ top: 0 });
   }
+
+  // Wait for Firebase to restore session before routing
+  if (!authReady) return null;
 
   const role = user?.role;
   const isDashboard = path.startsWith(ROUTES.dashboard);
 
+  // Resolve redirect target synchronously
   let redirect: string | null = null;
-  if (authReady && profileReady) {
-    if (path === ROUTES.dashboard)                        redirect = user ? dashboardPathFor(role!) : ROUTES.login;
-    else if (isDashboard && !user)                        redirect = ROUTES.login;
-    else if (isDashboard && !canAccessRoute(path, role))  redirect = dashboardPathFor(role!);
-  }
+  if (path === ROUTES.dashboard)          redirect = user ? dashboardPathFor(role!) : ROUTES.login;
+  else if (isDashboard && !user)          redirect = ROUTES.login;
+  else if (isDashboard && !canAccessRoute(path, role)) redirect = dashboardPathFor(role!);
 
-  useEffect(() => {
-    if (redirect) navigate(redirect);
-  }, [redirect]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (redirect) navigate(redirect); }, [redirect]);
+  if (redirect) return null;
 
-  if (!authReady || !profileReady || redirect) return (
-    <div className="min-h-screen bg-ink-950 flex items-center justify-center">
-      <div className="w-10 h-10 rounded-full border-2 border-gold-400 border-t-transparent animate-spin" />
-    </div>
-  );
-
-  const Page = PAGES[path];
+  const PAGES: Record<string, JSX.Element> = {
+    [ROUTES.home]:             <LandingPage navigate={navigate} />,
+    [ROUTES.login]:            <LoginPage navigate={navigate} />,
+    [ROUTES.adminLogin]:       <AdminLoginPage navigate={navigate} />,
+    [ROUTES.register]:         <RegisterPage navigate={navigate} />,
+    [ROUTES.book]:             <BookAppointmentPage navigate={navigate} />,
+    "/setup":                  <SetupPage navigate={navigate} />,
+    [ROUTES.adminDashboard]:   <AdminDashboard navigate={navigate} />,
+    [ROUTES.doctorDashboard]:  <DoctorDashboard navigate={navigate} />,
+    [ROUTES.staffDashboard]:   <StaffDashboard navigate={navigate} />,
+    [ROUTES.patientDashboard]: <PatientDashboard navigate={navigate} />,
+  };
 
   return (
-    <ErrorBoundary>
+    <>
       <OfflineBanner />
-      {Page ? <Page navigate={navigate} /> : <NotFoundPage navigate={navigate} />}
-    </ErrorBoundary>
+      {PAGES[path] ?? <NotFoundPage navigate={navigate} />}
+    </>
   );
 }

@@ -9,6 +9,7 @@ import { appointmentsService } from "../../services/appointments";
 import { useStore } from "../../store/store";
 import { BOOKING } from "../../shared/constants";
 import { KNOWN_DOCTOR_NAMES } from "../../services/bootstrap";
+import { formatTime12h } from "../../shared/helpers";
 import type { AppointmentSource } from "../../shared/types";
 
 
@@ -20,25 +21,6 @@ const tomorrow = () => {
   return d.toISOString().slice(0, 10);
 };
 
-function formatTime12h(time: string) {
-  if (!time) return "";
-
-  const [hours, minutes] = time.split(":").map(Number);
-
-  return new Date(
-    0,
-    0,
-    0,
-    hours,
-    minutes
-  ).toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
-}
-
-
 export function StaffManualBooking({ onClose }: { onClose: () => void }) {
   const { services, users } = useStore();
   const dbDoctors = users
@@ -48,6 +30,8 @@ export function StaffManualBooking({ onClose }: { onClose: () => void }) {
 
   const [patientName, setPatientName] = useState("");
   const [patientPhone, setPatientPhone] = useState("");
+  const [patientEmail, setPatientEmail] = useState("");
+  const [patientAddress, setPatientAddress] = useState("");
   const [serviceId, setServiceId] = useState(services[0]?.id ?? "");
   const [doctor, setDoctor] = useState(doctorOptions[0] ?? "");
   const [date, setDate] = useState(tomorrow());
@@ -64,6 +48,7 @@ export function StaffManualBooking({ onClose }: { onClose: () => void }) {
     setError("");
     if (!patientName.trim()) { setError("Patient name is required."); return; }
     if (patientPhone.trim() && !/^09\d{9}$/.test(patientPhone.replace(/\s/g, ""))) { setError("Phone must be a valid PH mobile number (e.g. 09xx xxx xxxx)."); return; }
+    if (patientEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(patientEmail.trim())) { setError("Enter a valid email address."); return; }
     if (!time) { setError("Please select a time slot."); return; }
     if (new Date(date + "T00:00:00").getDay() === 0) { setError("Clinic is closed on Sundays."); return; }
     if (!service) return;
@@ -76,6 +61,7 @@ export function StaffManualBooking({ onClose }: { onClose: () => void }) {
       await appointmentsService.book({
         patientId: matched?.id ?? `walkin_${crypto.randomUUID()}`,
         patientName: patientName.trim(),
+        patientEmail: patientEmail.trim() || undefined,
         patientPhone: patientPhone.trim() || undefined,
         serviceId: service.id,
         serviceName: service.name,
@@ -87,6 +73,7 @@ export function StaffManualBooking({ onClose }: { onClose: () => void }) {
         paymentMethod: "cash",
         paymentStatus: "unpaid",
         source,
+        notes: patientAddress.trim() ? `Address: ${patientAddress.trim()}` : undefined,
       });
       setDone(true);
     } catch (err: any) {
@@ -105,7 +92,7 @@ export function StaffManualBooking({ onClose }: { onClose: () => void }) {
         <p className="text-gold-100 font-medium">Appointment booked for <span className="text-gold-300">{patientName}</span></p>
         <p className="text-xs text-gold-100/50">{service?.name} · {date} at {formatTime12h(time)}</p>
         <div className="flex justify-center gap-3 pt-2">
-          <Button onClick={() => { setDone(false); setPatientName(""); setPatientPhone(""); setTime(""); }}>Book Another</Button>
+          <Button onClick={() => { setDone(false); setPatientName(""); setPatientPhone(""); setPatientEmail(""); setPatientAddress(""); setTime(""); }}>Book Another</Button>
           <Button variant="ghost" onClick={onClose}>Close</Button>
         </div>
       </div>
@@ -126,6 +113,14 @@ export function StaffManualBooking({ onClose }: { onClose: () => void }) {
           <Label htmlFor="mb-phone">Contact Number</Label>
           <Input id="mb-phone" placeholder="09XX XXX XXXX" value={patientPhone} onChange={(e) => setPatientPhone(e.target.value)} />
         </div>
+      </div>
+      <div>
+        <Label htmlFor="mb-email">Email Address <span className="text-gold-100/40 normal-case tracking-normal">(optional)</span></Label>
+        <Input id="mb-email" type="email" placeholder="patient@example.com" value={patientEmail} onChange={(e) => setPatientEmail(e.target.value)} />
+      </div>
+      <div>
+        <Label htmlFor="mb-address">Address / Barangay</Label>
+        <Input id="mb-address" placeholder="e.g. Brgy. Poblacion, Compostela" value={patientAddress} onChange={(e) => setPatientAddress(e.target.value)} />
       </div>
 
       <div>

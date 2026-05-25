@@ -32,9 +32,8 @@ export interface Service {
   id: string;
   name: string;
   price: number;
-  priceMax?: number;      // upper bound for range pricing (e.g. ₱700–₱800)
-  requiresDeposit?: boolean; // true = 30–50% downpayment required to confirm
-  duration: number; // minutes
+  priceMax?: number;
+  duration: number;
   description: string;
 }
 
@@ -49,12 +48,9 @@ export type AppointmentStatus =
 
 export type PaymentStatus =
   | "unpaid"
-  | "partial_paid"
-  | "pending_verification"
-  | "verified"
   | "paid";
 
-export type PaymentMethod = "gcash" | "cash";
+export type PaymentMethod = "cash";
 export type AppointmentSource = "online" | "facebook" | "sms" | "walk-in";
 
 export interface Appointment {
@@ -73,44 +69,22 @@ export interface Appointment {
   paymentMethod: PaymentMethod;
   paymentStatus: PaymentStatus;
   source?: AppointmentSource;
-  gcashRef?: string;
-  gcashScreenshotUrl?: string;
-  paymentScreenshotUrl?: string;
-  depositAmount?: number;
-  depositPaidAt?: string;
   notes?: string;
   diagnosis?: string;
   treatmentPlan?: string;
   dentalHistory?: string;
-  // Progress Note fields
   complaint?: string;
   prescription?: string;
   followUpDate?: string;
-  progressNoteAt?: string;   // ISO timestamp of when the progress note was first saved
-  progressNoteBy?: string;   // doctor name who wrote the note
-  toothChart?: Record<string, string>; // toothNumber → condition
-  beforeImageUrl?: string;
-  afterImageUrl?: string;
+  progressNoteAt?: string;
+  progressNoteBy?: string;
+  toothChart?: Record<string, string>;
   supportNote?: string;
   receiptNumber?: string;
   calendarEventId?: string;
-  emergency?: boolean;
   rescheduledAt?: string;
   createdAt: string;
   updatedAt?: string;
-}
-
-export interface WaitlistEntry {
-  id: string;
-  patientId: string;
-  patientName: string;
-  patientEmail?: string;
-  patientPhone?: string;
-  serviceId: string;
-  serviceName: string;
-  doctor: string;
-  preferredDate: string;
-  createdAt: string;
 }
 
 /** Per-doctor schedule overrides. If absent, clinic defaults apply. */
@@ -167,9 +141,6 @@ export interface ClinicSettings {
   workingHoursEnd: string;
   bookingInterval: number;
   maxAppointmentsPerDay: number;
-  allowEmergencyPriority: boolean;
-  gcashNumber: string;
-  gcashQrUrl?: string;   // uploadable QR code image shown to patients
   bookingRules: string;
 }
 

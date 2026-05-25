@@ -21,6 +21,7 @@ const SUB_ROLE_DEFAULTS: Record<StaffSubRole, Omit<StaffPermission, "staffId" | 
 export function StaffAccounts() {
   const { users, staffPermissions, user } = useStore();
   const staffUsers = users.filter((u) => u.role === "staff");
+  const coDoctorUsers = users.filter((u) => u.role === "co-doctor");
   const [newStaff, setNewStaff] = useState({ name: "", email: "", phone: "", password: "", role: "staff" as "staff" | "co-doctor", subRole: "general" as StaffSubRole });
   const [created, setCreated] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -93,6 +94,34 @@ export function StaffAccounts() {
               );
             })}
             {staffUsers.length === 0 && <p className="text-sm text-gold-100/50">No staff accounts created yet.</p>}
+          </div>
+
+          {/* Co-Doctor Accounts */}
+          <div className="mt-6">
+            <div className="text-[10px] uppercase tracking-[0.26em] text-gold-300/55 mb-3">Co-Doctor Accounts</div>
+            <div className="space-y-3">
+              {coDoctorUsers.map((cd) => (
+                <div key={cd.id} className="rounded-2xl border border-purple-500/20 bg-ink-900/55 p-4 flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-gold-100">{cd.name}</span>
+                      <Badge tone="neutral">Co-Doctor</Badge>
+                    </div>
+                    <div className="text-xs text-gold-100/50 mt-0.5">{cd.email}{cd.phone ? ` · ${cd.phone}` : ""}</div>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      if (!confirm(`Remove ${cd.name} from co-doctors?`)) return;
+                      await settingsService.removeStaff(cd.id);
+                    }}
+                    className="text-xs text-red-400/70 hover:text-red-400 transition px-2 py-1 rounded border border-red-500/20 hover:border-red-500/50"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+              {coDoctorUsers.length === 0 && <p className="text-sm text-gold-100/50">No co-doctor accounts created yet.</p>}
+            </div>
           </div>
         </Card>
 

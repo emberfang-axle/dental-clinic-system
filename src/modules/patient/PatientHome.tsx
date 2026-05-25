@@ -143,8 +143,8 @@ export function PatientHome({
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <Badge tone={a.status as any}>{a.status}</Badge>
-                    <Badge tone={a.paymentStatus === "paid" ? "paid" : a.paymentStatus === "partial_paid" ? "pending" : "neutral"}>
-                      {a.paymentStatus === "paid" ? "Paid" : a.paymentStatus === "partial_paid" ? "Partial" : "Unpaid"}
+                    <Badge tone={a.paymentStatus === "paid" ? "paid" : "neutral"}>
+                      {a.paymentStatus === "paid" ? "Paid" : "Unpaid"}
                     </Badge>
                   </div>
                 </div>

@@ -227,9 +227,7 @@ export function ReportsPage() {
   const topPatients  = [...visitCounts].sort((a, b) => b.billed - a.billed || b.count - a.count).slice(0, 5);
 
   // ── payment ──
-  const gcashCount = paid.filter((a) => a.paymentMethod === "gcash").length;
   const cashCount  = paid.filter((a) => a.paymentMethod === "cash").length;
-  const gcashRev   = paid.filter((a) => a.paymentMethod === "gcash").reduce((s, a) => s + a.price, 0);
   const cashRev    = paid.filter((a) => a.paymentMethod === "cash").reduce((s, a) => s + a.price, 0);
 
   return (
@@ -247,14 +245,14 @@ export function ReportsPage() {
           <button onClick={() => exportCSV(appointments.map((a) => ({
             Date: a.date, Time: a.time, Patient: a.patientName, Service: a.serviceName,
             Doctor: a.doctor, Status: a.status, Payment: a.paymentStatus,
-            Method: a.paymentMethod, Amount: a.price, Reference: a.gcashRef || "",
+            Method: a.paymentMethod, Amount: a.price,
           })), `appointments-${new Date().toISOString().slice(0, 10)}.csv`)}
             className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-gold-500/30 text-gold-300 hover:bg-gold-500/10 transition">
             ↓ Appointments
           </button>
           <button onClick={() => exportCSV(paid.map((a) => ({
             Date: a.date, Patient: a.patientName, Service: a.serviceName,
-            Method: a.paymentMethod, Reference: a.gcashRef || "", Amount: a.price, Receipt: a.receiptNumber || "",
+            Method: a.paymentMethod, Amount: a.price, Receipt: a.receiptNumber || "",
           })), `revenue-${new Date().toISOString().slice(0, 10)}.csv`)}
             className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-gold-500/30 text-gold-300 hover:bg-gold-500/10 transition">
             ↓ Revenue
@@ -384,31 +382,11 @@ export function ReportsPage() {
       <div className="grid xl:grid-cols-2 gap-6">
         <Card>
           <h3 className="font-serif text-xl text-gold-gradient mb-4">Payment Breakdown</h3>
-          <div className="grid grid-cols-2 gap-3 mb-4">
-            {[
-              { label: "GCash", count: gcashCount, rev: gcashRev, color: "text-blue-300" },
-              { label: "Cash",  count: cashCount,  rev: cashRev,  color: "text-emerald-300" },
-            ].map((p) => (
-              <div key={p.label} className="rounded-xl border border-gold-500/20 p-4 text-center">
-                <div className={`text-xs uppercase tracking-wider mb-1 ${p.color}`}>{p.label}</div>
-                <div className="text-2xl font-serif text-gold-gradient">{p.count}</div>
-                <div className="text-xs text-gold-100/50 mt-1">₱{p.rev.toLocaleString()}</div>
-              </div>
-            ))}
+          <div className="rounded-xl border border-gold-500/20 p-4 text-center">
+            <div className="text-xs uppercase tracking-wider mb-1 text-emerald-300">Cash</div>
+            <div className="text-2xl font-serif text-gold-gradient">{cashCount}</div>
+            <div className="text-xs text-gold-100/50 mt-1">₱{cashRev.toLocaleString()}</div>
           </div>
-          {/* GCash vs Cash bar */}
-          {(gcashCount + cashCount) > 0 && (
-            <div>
-              <div className="flex justify-between text-[10px] text-gold-100/40 mb-1">
-                <span>GCash {Math.round((gcashCount / (gcashCount + cashCount)) * 100)}%</span>
-                <span>Cash {Math.round((cashCount / (gcashCount + cashCount)) * 100)}%</span>
-              </div>
-              <div className="h-2 rounded-full bg-ink-700 overflow-hidden flex">
-                <div className="h-full bg-blue-500/70" style={{ width: `${(gcashCount / (gcashCount + cashCount)) * 100}%` }} />
-                <div className="h-full bg-emerald-500/70 flex-1" />
-              </div>
-            </div>
-          )}
         </Card>
 
         <Card>

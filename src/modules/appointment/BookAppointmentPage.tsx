@@ -6,14 +6,13 @@
 
 import { useState } from "react";
 import { Logo } from "../../components/Logo";
-import { Badge, Button, Input, Label } from "../../components/ui";
+import { Button, Input, Label } from "../../components/ui";
 import { appointmentsService } from "../../services/appointments";
 import { calendarService } from "../../services/calendar";
-import { waitlistService } from "../../services/waitlist";
 import { KNOWN_DOCTOR_NAMES } from "../../services/bootstrap";
 import { useStore } from "../../store/store";
-import { BOOKING, ROUTES } from "../../shared/constants";
-import { dashboardPathFor } from "../../shared/helpers";
+import { BOOKING, ROUTES, getSlotsForDate } from "../../shared/constants";
+import { dashboardPathFor, formatTime12h } from "../../shared/helpers";
 
 
 const SERVICE_CATEGORIES = [
@@ -23,6 +22,13 @@ const SERVICE_CATEGORIES = [
   { label: "Prosthodontics", names: ["dentures", "removable dentures", "ivocap dentures"] },
   { label: "Surgical / Emergency", names: ["tooth extraction (bunot)", "odontectomy (3rd molar removal)", "emergency dental services"] },
 ];
+
+// Services that can be booked WITHOUT a prior consultation
+const NO_CONSULT_REQUIRED = new Set(["oral consultation"]);
+
+function isSunday(dateStr: string) {
+  return new Date(dateStr + "T00:00:00").getDay() === 0;
+}
 
 export function BookAppointmentPage({ navigate }: { navigate: (p: string) => void }) {
   const { user, services: rawServices, appointments, users, doctorSchedules, settings } = useStore();
@@ -37,22 +43,58 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
     .filter((d, i, arr) => arr.findIndex((x) => x.name === d.name) === i);
 
   const [step, setStep] = useState(1);
-  const [serviceId, setServiceId] = useState(() => services[0]?.id ?? "");
+  const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>(() => services[0] ? [services[0].id] : []);
   const [doctor, setDoctor] = useState(() => doctorOptions[0]?.name ?? "");
   const [date, setDate] = useState(() => {
     const d = new Date();
     d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    // Skip to Monday only if today is Sunday
+    if (d.getDay() === 0) d.setDate(d.getDate() + 1);
     return d.toISOString().slice(0, 10);
   });
   const [time, setTime] = useState("");
-  const [paymentMethod] = useState<"cash" | "gcash">("cash");
-  const [emergency, setEmergency] = useState(false);
   const [confirmed, setConfirmed] = useState<string | null>(null);
   const [bookingError, setBookingError] = useState("");
   const [booking, setBooking] = useState(false);
+  const [showConsultationModal, setShowConsultationModal] = useState(false);
+  const [pendingSurgicalName, setPendingSurgicalName] = useState("");
 
+  // Primary service is the first selected
+  const serviceId = selectedServiceIds[0] ?? services[0]?.id ?? "";
   const service = services.find((s) => s.id === serviceId) ?? services[0];
+  const selectedServices = services.filter((s) => selectedServiceIds.includes(s.id));
+  const totalPrice = selectedServices.reduce((sum, s) => sum + s.price, 0);
   if (!service) return null;
+
+  // Check if patient has a completed or confirmed consultation
+  const consultationService = services.find((s) => s.name.toLowerCase() === "oral consultation");
+  const hasConsultation = consultationService
+    ? appointments.some(
+        (a) =>
+          a.patientId === user?.id &&
+          a.serviceId === consultationService.id &&
+          (a.status === "completed" || a.status === "confirmed" || a.status === "in-progress")
+      )
+    : false;
+
+  // A service requires consultation first unless it IS the consultation
+  function requiresConsult(s: typeof services[0]) {
+    return !NO_CONSULT_REQUIRED.has(s.name.toLowerCase());
+  }
+
+  function handleServiceSelect(s: typeof services[0]) {
+    if (requiresConsult(s) && !hasConsultation) {
+      setPendingSurgicalName(s.name);
+      setShowConsultationModal(true);
+      return;
+    }
+    setSelectedServiceIds((prev) => {
+      if (prev.includes(s.id)) {
+        return prev.length > 1 ? prev.filter((id) => id !== s.id) : prev;
+      }
+      return [...prev, s.id];
+    });
+  }
 
   if (!user) {
     return (
@@ -74,7 +116,7 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
   const doctorSchedule = doctorSchedules.find((s) => s.doctorName === doctor);
   const availableSlots: readonly string[] = doctorSchedule?.timeSlots?.length
     ? doctorSchedule.timeSlots
-    : BOOKING.TIME_SLOTS;
+    : getSlotsForDate(date);
 
   const takenTimes = appointments
     .filter((a) => a.date === date && a.status !== "cancelled")
@@ -105,10 +147,8 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
         return;
       }
 
-      if (new Date(date + "T00:00:00").getDay() === 0) {
-        setBookingError(
-          "The clinic is closed on Sundays. Please pick another day."
-        );
+      if (isSunday(date)) {
+        setBookingError("The clinic is closed on Sundays. Please pick another day.");
         return;
       }
 
@@ -163,9 +203,8 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
         price: service!.price,
         doctor, date, time,
         status: "pending",
-        paymentMethod,
+        paymentMethod: "cash",
         paymentStatus: "unpaid" as const,
-        emergency,
       });
       setConfirmed(ap.id);
     } catch (err) {
@@ -176,7 +215,6 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
   }
 
   if (confirmed) {
-    const depositAmount = service!.requiresDeposit ? Math.ceil(service!.price * 0.3) : null;
     return (
       <Centered navigate={navigate}>
         <div className="max-w-lg w-full glass-strong rounded-2xl p-10 text-center shadow-luxe fade-up">
@@ -188,30 +226,14 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
             Appointment <span className="font-script italic">Booked!</span>
           </h2>
           <p className="text-gold-100/70 mt-5 leading-relaxed">
-            Your appointment for <span className="text-gold-300 font-medium">{service.name}</span> on{" "}
-            <span className="text-gold-300 font-medium">{date}</span> at{" "}
+            Your appointment for{" "}
+            <span className="text-gold-300 font-medium">
+              {selectedServices.map((s) => s.name).join(", ")}
+            </span>{" "}
+            on <span className="text-gold-300 font-medium">{date}</span> at{" "}
             <span className="text-gold-300 font-medium">{formatTime12h(time)}</span> has been received.
           </p>
           <p className="text-sm text-gold-100/55 mt-3">Please arrive 10 minutes before your scheduled appointment.</p>
-
-          {/* Deposit guidance for deposit-required services */}
-          {depositAmount && (
-            <div className="mt-6 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-left space-y-2">
-              <p className="text-sm font-semibold text-amber-300">Deposit Required to Confirm</p>
-              <p className="text-xs text-amber-200/80 leading-relaxed">
-                This service requires a minimum <span className="font-semibold text-amber-300">30% deposit (₱{depositAmount.toLocaleString()})</span> to secure your slot.
-              </p>
-              {paymentMethod === "gcash" ? (
-                <p className="text-xs text-amber-200/70">
-                  Send ₱{depositAmount.toLocaleString()} via GCash, then submit your reference number in the <span className="text-gold-300 font-medium">Payments</span> tab of your dashboard.
-                </p>
-              ) : (
-                <p className="text-xs text-amber-200/70">
-                  Please pay ₱{depositAmount.toLocaleString()} in cash at the clinic before your appointment date to confirm your slot.
-                </p>
-              )}
-            </div>
-          )}
 
           <div className="mt-8 flex justify-center gap-3">
             <Button onClick={() => navigate(dashboardPathFor(user.role))}>Go to Dashboard</Button>
@@ -232,6 +254,33 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
         <button onClick={() => navigate(ROUTES.home)}><Logo /></button>
         <Button variant="ghost" size="sm" onClick={() => navigate(dashboardPathFor(user.role))}>Cancel</Button>
       </header>
+
+      {/* Consultation Required Modal */}
+      {showConsultationModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <button className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowConsultationModal(false)} aria-label="Close" />
+          <div className="relative glass-strong rounded-2xl p-8 max-w-md w-full shadow-luxe text-center space-y-4">
+            <div className="w-16 h-16 mx-auto rounded-full bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-3xl">🦷</div>
+            <h3 className="font-serif text-2xl text-gold-shine">Consultation Required</h3>
+            <p className="text-sm text-gold-100/70 leading-relaxed">
+              To book <span className="text-gold-200 font-medium">{pendingSurgicalName}</span>, you first need an <span className="text-amber-300 font-medium">Oral Consultation</span>.
+            </p>
+            <p className="text-sm text-gold-100/60 leading-relaxed">
+              The doctor will examine your teeth, assess your condition, and recommend the right treatment. This ensures you receive the safest and most appropriate care.
+            </p>
+            <div className="flex flex-col gap-2 pt-2">
+              <Button onClick={() => {
+                setShowConsultationModal(false);
+                const consult = services.find((s) => s.name.toLowerCase() === "oral consultation");
+                if (consult) { setSelectedServiceIds([consult.id]); setStep(2); }
+              }}>
+                Book Oral Consultation Instead
+              </Button>
+              <Button variant="ghost" onClick={() => setShowConsultationModal(false)}>Cancel</Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="relative max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
         <div className="text-center mb-10">
@@ -266,7 +315,7 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
             <div>
               <div className="text-center mb-6">
                 <h3 className="font-serif text-2xl text-gold-shine mb-1">Select a Service</h3>
-                <p className="text-sm text-gold-100/50">Choose the treatment you need.</p>
+                <p className="text-sm text-gold-100/50">Choose one or more treatments. You can select multiple services.</p>
               </div>
               {(() => {
                 const categorised = SERVICE_CATEGORIES.map((cat) => ({
@@ -276,45 +325,55 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
                 const categorisedNames = new Set(SERVICE_CATEGORIES.flatMap((c) => c.names));
                 const other = services.filter((s) => !categorisedNames.has(s.name.toLowerCase()));
                 if (other.length > 0) categorised.push({ label: "Other", items: other });
+                const allIds = services.map((s) => s.id);
+                const allSelected = allIds.every((id) => selectedServiceIds.includes(id));
                 return (
                   <div className="space-y-5">
+                    {/* Select All */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-gold-100/50">{selectedServiceIds.length} selected · Total: ₱{totalPrice.toLocaleString()}</span>
+                      <button
+                        onClick={() => setSelectedServiceIds(allSelected ? [services[0]?.id ?? ""] : allIds)}
+                        className="text-xs px-3 py-1.5 rounded-lg border border-gold-500/30 text-gold-300 hover:border-gold-400 transition">
+                        {allSelected ? "Deselect All" : "Select All"}
+                      </button>
+                    </div>
                     {categorised.map((cat) => (
                       <div key={cat.label}>
                         <p className="text-[10px] uppercase tracking-[0.3em] text-gold-400/70 font-semibold mb-2">{cat.label}</p>
                         <div className="grid sm:grid-cols-2 gap-3">
-                          {cat.items.map((s) => (
+                          {cat.items.map((s) => {
+                            const locked = requiresConsult(s) && !hasConsultation;
+                            const isSelected = selectedServiceIds.includes(s.id);
+                            return (
                             <button key={s.id}
-                              onClick={() => { if (serviceId === s.id) { setStep(2); } else { setServiceId(s.id); } }}
-                              className={`text-left p-4 rounded-xl border transition ${serviceId === s.id ? "border-gold-400 bg-gold-500/10" : "border-gold-500/20 hover:border-gold-400/50"}`}>
+                              onClick={() => handleServiceSelect(s)}
+                              className={`text-left p-4 rounded-xl border transition ${isSelected ? "border-gold-400 bg-gold-500/10" : locked ? "border-gold-500/15 opacity-70 hover:border-amber-500/40" : "border-gold-500/20 hover:border-gold-400/50"}`}>
                               <div className="flex items-center justify-between gap-2">
-                                <span className="font-medium text-gold-100">{s.name}</span>
+                                <span className="font-medium text-gold-100 flex items-center gap-2">
+                                  {isSelected && <span className="text-gold-400 text-sm">✓</span>}
+                                  {s.name}
+                                  {locked && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 border border-amber-500/30 text-amber-300 font-semibold uppercase tracking-wider">Consultation Required</span>}
+                                </span>
                                 <span className="text-gold-300 font-mono text-sm whitespace-nowrap">
                                   ₱{s.price.toLocaleString()}{s.priceMax ? `–₱${s.priceMax.toLocaleString()}` : ""}
                                 </span>
                               </div>
                               <div className="text-xs text-gold-100/50 mt-1">{s.duration} min · {s.description}</div>
-                              {s.requiresDeposit && (
-                                <div className="mt-2 text-[10px] uppercase tracking-wider font-semibold text-amber-300 bg-amber-500/10 border border-amber-500/25 rounded px-1.5 py-0.5 inline-block">
-                                  Deposit: ₱{Math.ceil(s.price * 0.3).toLocaleString()} required
+                              {locked && (
+                                <div className="mt-2 text-xs text-amber-200/70 leading-relaxed">
+                                  🦷 Book an <span className="text-amber-300 font-medium">Oral Consultation</span> first. The doctor will assess your condition and recommend the right treatment for you.
                                 </div>
                               )}
-                              {serviceId === s.id && (
-                                <div className="mt-2 text-[10px] text-gold-400 font-semibold">Selected — tap again to continue</div>
-                              )}
                             </button>
-                          ))}
+                            );
+                          })}
                         </div>
                       </div>
                     ))}
                   </div>
                 );
               })()}
-              {service?.requiresDeposit && (
-                <div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/8 p-3 text-xs text-amber-200/80 leading-relaxed">
-                  <span className="font-semibold text-amber-300">Downpayment Notice: </span>
-                  This service requires a minimum deposit of <span className="font-semibold text-amber-300">₱{Math.ceil(service.price * 0.3).toLocaleString()}</span> (30% of ₱{service.price.toLocaleString()}) to confirm your reservation. The remaining balance of <span className="font-semibold text-amber-300">₱{(service.price - Math.ceil(service.price * 0.3)).toLocaleString()}</span> can be settled during or after treatment.
-                </div>
-              )}
             </div>
           )}
 
@@ -364,12 +423,12 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
                     })()}
                     onChange={(e) => {
                       const val = e.target.value;
-                      if (new Date(val + "T00:00:00").getDay() === 0) {
+                      if (isSunday(val)) {
                         setBookingError("The clinic is closed on Sundays. Please pick another day.");
                         return;
                       }
                       if (calendarService.isDateBlocked(val)) {
-                        setBookingError("This date is fully blocked (clinic holiday or doctor unavailable). Please pick another day.");
+                        setBookingError("This date is blocked (clinic holiday or doctor unavailable). Please pick another day.");
                         return;
                       }
                       setBookingError("");
@@ -439,32 +498,6 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
                   </div>
                 </div>
               </div>
-              <label className="mt-5 flex items-center gap-2 text-sm text-gold-100/70">
-                <input type="checkbox" checked={emergency} onChange={(e) => setEmergency(e.target.checked)} className="accent-gold-500" />
-                Mark as <span className="text-red-400 font-medium">emergency</span> (priority handling)
-              </label>
-
-              {/* Waitlist — show when all slots are taken */}
-              {availableSlots.every((t) => takenTimes.includes(t)) && (
-                <div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/8 p-4 space-y-2">
-                  <p className="text-sm font-semibold text-amber-300">All slots are full for this date.</p>
-                  <p className="text-xs text-amber-200/70">Join the waitlist and we'll notify you if a slot opens up.</p>
-                  <Button size="sm" variant="outline" onClick={async () => {
-                    await waitlistService.join({
-                      patientId: user!.id,
-                      patientName: user!.name,
-                      patientEmail: user!.email,
-                      patientPhone: user!.phone,
-                      serviceId: service!.id,
-                      serviceName: service!.name,
-                      doctor,
-                      preferredDate: date,
-                    });
-                  }}>
-                    Join Waitlist for {date}
-                  </Button>
-                </div>
-              )}
             </div>
           )}
 
@@ -476,14 +509,21 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
               </div>
               <div className="space-y-3 text-sm">
                 <Row label="Patient" value={user.name} />
-                <Row label="Service" value={service!.name} />
+                <Row label="Service(s)" value={
+                  <div className="text-right space-y-0.5">
+                    {selectedServices.map((s) => (
+                      <div key={s.id} className="text-gold-100 font-medium">{s.name} <span className="text-gold-300/70 font-mono text-xs">₱{s.price.toLocaleString()}</span></div>
+                    ))}
+                    {selectedServices.length > 1 && (
+                      <div className="text-gold-400 font-semibold text-xs border-t border-gold-500/20 pt-1">Total: ₱{totalPrice.toLocaleString()}</div>
+                    )}
+                  </div>
+                } />
                 <Row label="Doctor" value={doctor} />
                 <Row
                   label="Date & Time"
-                  value={`${date} · ${time ? formatTime12h(time) : "—"
-                    }`}
+                  value={`${date} · ${time ? formatTime12h(time) : "—"}`}
                 />
-                {emergency && <Row label="Priority" value={<Badge tone="emergency">EMERGENCY</Badge>} />}
               </div>
             </div>
           )}
@@ -511,24 +551,6 @@ export function BookAppointmentPage({ navigate }: { navigate: (p: string) => voi
   );
 }
 
-
-function formatTime12h(time: string) {
-  if (!time) return "";
-
-  const [hours, minutes] = time.split(":").map(Number);
-
-  return new Date(
-    0,
-    0,
-    0,
-    hours,
-    minutes
-  ).toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
-}
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (

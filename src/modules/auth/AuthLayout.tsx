@@ -38,7 +38,7 @@ export function AuthLayout({ children, navigate }: { children: React.ReactNode; 
             </p>
             <div className="mt-8 grid grid-cols-3 gap-4">
               <div><div className="text-[11px] uppercase tracking-[0.2em] text-gold-300/70 font-semibold">Online</div><div className="mt-1 text-sm text-gold-100/80">Booking</div></div>
-              <div><div className="text-[11px] uppercase tracking-[0.2em] text-gold-300/70 font-semibold">Secure</div><div className="mt-1 text-sm text-gold-100/80">GCash + Cash</div></div>
+              <div><div className="text-[11px] uppercase tracking-[0.2em] text-gold-300/70 font-semibold">Secure</div><div className="mt-1 text-sm text-gold-100/80">Cash Payment</div></div>
               <div><div className="text-[11px] uppercase tracking-[0.2em] text-gold-300/70 font-semibold">Real-time</div><div className="mt-1 text-sm text-gold-100/80">Schedule</div></div>
             </div>
           </div>

@@ -198,9 +198,7 @@ export function downloadInvoice(a: Appointment) {
   const dueDate    = issuedDate; // paid on issue
 
   const subtotal = a.price;
-  const deposit  = a.depositAmount ?? 0;
-  const balance  = subtotal - deposit;
-  const isPaid   = a.paymentStatus === "paid" || a.paymentStatus === "verified";
+  const isPaid   = a.paymentStatus === "paid";
 
   // Absolute URL for the logo so it works in a new window
   const logoUrl = `${window.location.origin}/images/logo.png`;
@@ -393,9 +391,8 @@ export function downloadInvoice(a: Appointment) {
     <div class="totals-box">
       <table>
         <tr class="sub-row"><td>Subtotal</td><td>₱${subtotal.toLocaleString()}</td></tr>
-        ${deposit > 0 ? `<tr class="sub-row"><td>Deposit Paid</td><td>-₱${deposit.toLocaleString()}</td></tr>` : ""}
         <tr class="sub-row"><td>Tax (0%)</td><td>₱0.00</td></tr>
-        <tr class="total-row"><td>Total Due</td><td>₱${balance.toLocaleString()}</td></tr>
+        <tr class="total-row"><td>Total Due</td><td>₱${subtotal.toLocaleString()}</td></tr>
       </table>
     </div>
   </div>
@@ -404,13 +401,12 @@ export function downloadInvoice(a: Appointment) {
   <div class="payment-section">
     <div class="info-box">
       <div class="label">Payment Details</div>
-      <div class="info-row"><span>Method</span><span>${a.paymentMethod === "gcash" ? "GCash" : "Cash"}</span></div>
-      ${a.gcashRef ? `<div class="info-row"><span>Reference</span><span>${a.gcashRef}</span></div>` : ""}
+      <div class="info-row"><span>Method</span><span>Cash</span></div>
       <div class="info-row"><span>Date</span><span>${issuedDate}</span></div>
       <div class="info-row"><span>Status</span>
         <span>
-          <span class="badge ${isPaid ? "badge-paid" : a.paymentStatus === "pending_verification" ? "badge-pending" : "badge-unpaid"}">
-            ${isPaid ? "Paid" : a.paymentStatus.replace(/_/g, " ")}
+          <span class="badge ${isPaid ? "badge-paid" : "badge-unpaid"}">
+            ${isPaid ? "Paid" : "Unpaid"}
           </span>
         </span>
       </div>

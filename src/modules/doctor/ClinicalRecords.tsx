@@ -1,68 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { Badge, Button, Card, Input, Label, Select, Textarea } from "../../components/ui";
+import { ToothChart } from "../../components/ui/ToothChart";
 import { recordsService } from "../../services/records";
-import { uploadFile, treatmentPhotoPath } from "../../services/upload";
 import { useStore } from "../../store/store";
-import { ImagePreview } from "../shared/SharedModules";
 import { formatDateTime } from "../../shared/helpers";
 import type { Appointment } from "../../shared/types";
-
-function canEditPhotos(role: string) {
-  return role === "admin" || role === "doctor" || role === "co-doctor";
-}
-
-function PhotoUploadSlot({
-  type, form, selected, isReadOnly,
-  onSaved, onError,
-}: {
-  type: "before" | "after";
-  form: RecordForm;
-  selected: Appointment;
-  isReadOnly: boolean;
-  onSaved: (key: "beforeImageUrl" | "afterImageUrl", url: string) => void;
-  onError: (msg: string) => void;
-}) {
-  const [uploading, setUploading] = useState(false);
-  const key = type === "before" ? "beforeImageUrl" : "afterImageUrl" as const;
-  const src = form[key];
-
-  return (
-    <div>
-      <Label>{type === "before" ? "Before Treatment" : "After Treatment"}</Label>
-      <input
-        type="file" accept="image/*"
-        disabled={isReadOnly || uploading}
-        className="mt-1 w-full text-sm text-gold-100/70 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border file:border-gold-500/30 file:bg-ink-900/60 file:text-gold-200 file:text-xs file:cursor-pointer hover:file:border-gold-400/60 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-        onChange={async (e) => {
-          const file = e.target.files?.[0];
-          if (!file) return;
-          setUploading(true);
-          onError("");
-          try {
-            const url = await uploadFile(file, treatmentPhotoPath(selected.id, type, file.name));
-            onSaved(key, url);
-          } catch (err: any) {
-            onError(err.message || "Upload failed.");
-          } finally {
-            setUploading(false);
-            e.target.value = "";
-          }
-        }}
-      />
-      {uploading && <p className="text-xs text-gold-300/60 mt-1">Uploading…</p>}
-      <div className="mt-3">
-        <ImagePreview title={type === "before" ? "Before" : "After"} src={src} />
-        {src && !isReadOnly && (
-          <button
-            onClick={() => onSaved(key, "")}
-            className="mt-2 text-xs text-red-400 hover:text-red-300 transition">
-            Remove photo
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
 
 function MedRow({ label, value }: { label: string; value: string }) {
   return (
@@ -78,8 +20,6 @@ type RecordForm = {
   treatmentPlan: string;
   dentalHistory: string;
   notes: string;
-  beforeImageUrl: string;
-  afterImageUrl: string;
   toothChart: Record<string, string>;
 };
 
@@ -94,7 +34,7 @@ type ProgressForm = {
 
 const EMPTY_FORM: RecordForm = {
   diagnosis: "", treatmentPlan: "", dentalHistory: "",
-  notes: "", beforeImageUrl: "", afterImageUrl: "", toothChart: {},
+  notes: "", toothChart: {},
 };
 
 const EMPTY_PROGRESS: ProgressForm = {
@@ -103,10 +43,10 @@ const EMPTY_PROGRESS: ProgressForm = {
 };
 
 const TABS = [
-  { id: "progress", label: "Progress Notes" },
-  { id: "notes",    label: "Clinical Notes" },
-  { id: "photos",   label: "Before / After" },
-  { id: "history",  label: "Patient History" },
+  { id: "progress",   label: "Progress Notes" },
+  { id: "toothchart", label: "Tooth Chart" },
+  { id: "notes",      label: "Clinical Notes" },
+  { id: "history",    label: "Patient History" },
 ] as const;
 
 type TabId = typeof TABS[number]["id"];
@@ -157,8 +97,6 @@ export function ClinicalRecords() {
       treatmentPlan:  selected.treatmentPlan  || "",
       dentalHistory:  selected.dentalHistory  || "",
       notes:          selected.notes          || "",
-      beforeImageUrl: selected.beforeImageUrl || "",
-      afterImageUrl:  selected.afterImageUrl  || "",
       toothChart:     selected.toothChart ?? {},
     });
     setProgressForm({
@@ -216,14 +154,6 @@ export function ClinicalRecords() {
     } finally {
       setDeleting(false);
     }
-  }
-
-  function handlePhotoSaved(key: "beforeImageUrl" | "afterImageUrl", url: string) {
-    const updated = { ...form, [key]: url };
-    setForm(updated);
-    recordsService.saveTreatment(selected.id, updated, user!.name)
-      .then(() => setSaved(true))
-      .catch((e: any) => setSaveError(e.message || "Failed to save photo."));
   }
 
   const patient = users.find((u) => u.id === selected.patientId);
@@ -434,34 +364,27 @@ export function ClinicalRecords() {
         </Card>
       )}
 
-      {/* PHOTOS TAB */}
-      {activeTab === "photos" && (
+      {/* TOOTH CHART TAB */}
+      {activeTab === "toothchart" && (
         <Card>
           <div className="mb-5">
-            <div className="text-[10px] uppercase tracking-[0.26em] text-gold-300/55">Visual documentation</div>
-            <h3 className="font-serif text-xl text-gold-gradient mt-0.5">Before & After — {selected.patientName}</h3>
+            <div className="text-[10px] uppercase tracking-[0.26em] text-gold-300/55">Odontogram</div>
+            <h3 className="font-serif text-xl text-gold-gradient mt-0.5">Tooth Chart — {selected.patientName}</h3>
+            <p className="text-xs text-gold-100/40 mt-1">Click a tooth to cycle through conditions. Changes are saved automatically.</p>
           </div>
-
-          {!canEditPhotos(user.role) ? (
-            <p className="text-sm text-gold-100/50">Photo uploads are restricted to doctors and admins.</p>
-          ) : (
-            <div className="grid md:grid-cols-2 gap-6">
-              {(["before", "after"] as const).map((type) => (
-                <PhotoUploadSlot
-                  key={type}
-                  type={type}
-                  form={form}
-                  selected={selected}
-                  isReadOnly={isReadOnly}
-                  onSaved={handlePhotoSaved}
-                  onError={setSaveError}
-                />
-              ))}
-            </div>
-          )}
-
+          <ToothChart
+            value={form.toothChart}
+            readOnly={isReadOnly}
+            onChange={(updated) => {
+              const updatedForm = { ...form, toothChart: updated };
+              setForm(updatedForm);
+              recordsService.saveTreatment(selected.id, updatedForm, user!.name)
+                .then(() => setSaved(true))
+                .catch((e: any) => setSaveError(e.message || "Failed to save tooth chart."));
+            }}
+          />
           {saveError && <p className="mt-3 text-sm text-red-400">{saveError}</p>}
-          {saved && <p className="mt-3 text-sm text-emerald-400">Photos saved.</p>}
+          {saved && <p className="mt-3 text-sm text-emerald-400">Tooth chart saved.</p>}
         </Card>
       )}
 

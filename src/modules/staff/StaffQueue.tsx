@@ -5,11 +5,11 @@ import { useStore } from "../../store/store";
 import type { Appointment, AppointmentStatus } from "../../shared/types";
 import { DepositForm } from "./DepositForm";
 
-const COLUMNS: { key: AppointmentStatus; label: string }[] = [
-  { key: "pending",     label: "Pending" },
-  { key: "confirmed",   label: "Confirmed" },
-  { key: "in-progress", label: "In Progress" },
-  { key: "completed",   label: "Completed" },
+const COLUMNS: { key: AppointmentStatus; label: string; short: string }[] = [
+  { key: "pending",     label: "Pending",     short: "Pending" },
+  { key: "confirmed",   label: "Confirmed",   short: "Confirmed" },
+  { key: "in-progress", label: "In Progress", short: "In Progress" },
+  { key: "completed",   label: "Completed",   short: "Completed" },
 ];
 
 export function StaffQueue() {
@@ -19,9 +19,10 @@ export function StaffQueue() {
   const [deduping, setDeduping] = useState(false);
   const [dedupMsg, setDedupMsg] = useState<string | null>(null);
 
+  // FIFO: oldest createdAt first (first booked = first served)
   const queue = appointments
     .filter((a) => a.status !== "cancelled")
-    .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+    .sort((a, b) => (a.createdAt ?? a.date + a.time).localeCompare(b.createdAt ?? b.date + b.time));
 
   const todayQueue = queue.filter((a) => a.date === today);
 
@@ -72,41 +73,112 @@ export function StaffQueue() {
       </div>
 
       {/* Stats row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-4 gap-2">
         {COLUMNS.map((col) => {
           const count = queue.filter((a) => a.status === col.key).length;
           return (
-            <div key={col.key} className="glass-strong rounded-xl p-4">
-              <div className="text-[10px] uppercase tracking-wider text-gold-300/55 mb-1">{col.label}</div>
-              <div className="font-serif text-2xl text-gold-shine">{count}</div>
+            <div key={col.key} className="glass-strong rounded-xl p-2.5 text-center">
+              <div className="text-[9px] uppercase tracking-wider text-gold-300/55 mb-0.5 truncate">{col.short}</div>
+              <div className="font-serif text-xl text-gold-shine">{count}</div>
             </div>
           );
         })}
       </div>
 
-      {/* Kanban columns */}
-      <div className="grid xl:grid-cols-4 gap-4">
-        {COLUMNS.map((col) => {
-          const list = queue.filter((a) => a.status === col.key);
-          return (
-            <div key={col.key} className="space-y-3">
-              <div className="flex items-center justify-between px-1">
-                <h4 className="font-medium text-gold-100 text-sm">{col.label}</h4>
-                <Badge tone={col.key as any}>{list.length}</Badge>
-              </div>
-              {list.length === 0 && (
-                <div className="rounded-xl border border-gold-500/10 bg-ink-900/30 p-4 text-xs text-gold-100/35 text-center">
-                  No patients
-                </div>
+      {/* Queue as table */}
+      <div className="glass-strong rounded-xl overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[640px]">
+            <thead className="border-b border-gold-500/15 bg-ink-900/60">
+              <tr className="text-left text-[10px] uppercase tracking-wider text-gold-300/60">
+                <th className="px-4 py-3">Patient</th>
+                <th className="px-4 py-3">Service</th>
+                <th className="px-4 py-3">Date · Time</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Payment</th>
+                <th className="px-4 py-3">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {queue.length === 0 && (
+                <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-gold-100/40">No appointments in queue.</td></tr>
               )}
-              {list.map((a) => (
-                <QueueCard key={a.id} a={a} today={today} onUpdate={tryUpdate} actor={user!.name} />
+              {queue.map((a) => (
+                <tr key={a.id} className="border-b border-gold-500/10 hover:bg-gold-500/5 transition">
+                  <td className="px-4 py-3">
+                    <div className="font-medium text-gold-100">{a.patientName}</div>
+                    {a.patientPhone && <div className="text-xs text-gold-100/40">{a.patientPhone}</div>}
+                  </td>
+                  <td className="px-4 py-3 text-gold-100/70 text-xs">{a.serviceName}</td>
+                  <td className="px-4 py-3 text-xs text-gold-100/60 whitespace-nowrap">
+                    <span className={a.date === today ? "text-amber-300 font-medium" : ""}>{a.date === today ? "Today" : a.date}</span>
+                    <span className="text-gold-100/40"> · {a.time}</span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <Badge tone={a.status === "in-progress" ? "confirmed" : a.status as any}>
+                      {a.status === "in-progress" ? "In Prog." : a.status === "confirmed" ? "Confirmed" : a.status === "pending" ? "Pending" : a.status === "completed" ? "Done" : a.status}
+                    </Badge>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`text-xs font-medium ${a.paymentStatus === "paid" ? "text-emerald-400" : "text-gold-100/50"}`}>
+                      {a.paymentStatus === "paid" ? "Paid" : "Unpaid"}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <QueueActions a={a} today={today} onUpdate={tryUpdate} actor={user!.name} />
+                  </td>
+                </tr>
               ))}
-            </div>
-          );
-        })}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
+  );
+}
+
+function QueueActions({ a, today, onUpdate, actor }: {
+  a: Appointment;
+  today: string;
+  onUpdate: (id: string, data: Partial<Appointment>) => Promise<void>;
+  actor: string;
+}) {
+  const [pending, setPending] = useState<{ label: string; data: Partial<Appointment> } | null>(null);
+
+  return (
+    <>
+      {pending && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <button className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setPending(null)} />
+          <div className="relative glass-strong rounded-2xl p-6 max-w-sm w-full shadow-luxe space-y-4 text-center">
+            <div className="w-12 h-12 mx-auto rounded-full bg-gold-500/15 border border-gold-500/30 flex items-center justify-center text-2xl">✓</div>
+            <h3 className="font-serif text-xl text-gold-shine">{pending.label} this appointment?</h3>
+            <p className="text-sm text-gold-100/60">
+              <span className="text-gold-200 font-medium">{a.patientName}</span> — {a.serviceName}<br />
+              <span className="text-gold-100/50">{a.date === today ? "Today" : a.date} at {a.time}</span>
+            </p>
+            <div className="flex gap-3 justify-center">
+              <Button onClick={() => { onUpdate(a.id, pending.data); setPending(null); }}>Yes, Confirm</Button>
+              <Button variant="ghost" onClick={() => setPending(null)}>Cancel</Button>
+            </div>
+          </div>
+        </div>
+      )}
+      <div className="flex flex-wrap gap-1.5">
+        {a.status === "pending" && (
+          <Button size="sm" onClick={() => setPending({ label: "Confirm", data: { status: "confirmed" } })}>Confirm</Button>
+        )}
+        {a.status === "confirmed" && (
+          <Button size="sm" onClick={() => setPending({ label: "Check In", data: { status: "in-progress" } })}>Check In</Button>
+        )}
+        {a.status === "in-progress" && (
+          <Button size="sm" onClick={() => setPending({ label: "Complete", data: { status: "completed" } })}>Complete</Button>
+        )}
+        {a.status === "completed" && a.paymentStatus !== "paid" && (
+          <Button size="sm" onClick={() => setPending({ label: "Mark as Paid", data: { paymentMethod: "cash", paymentStatus: "paid" } })}>Mark as Paid</Button>
+        )}
+      </div>
+    </>
   );
 }
 
@@ -131,7 +203,6 @@ function QueueCard({ a, today, onUpdate, actor }: {
             </a>
           )}
         </div>
-        {a.emergency && <Badge tone="emergency">Priority</Badge>}
       </div>
 
       {/* Status progression buttons */}
@@ -158,84 +229,18 @@ function PaymentActions({ a, onUpdate, actor }: {
   onUpdate: (id: string, data: Partial<Appointment>) => Promise<void>;
   actor: string;
 }) {
-  const [imgOpen, setImgOpen] = useState(false);
-
   if (a.paymentStatus === "paid") {
-    return <p className="text-xs text-emerald-400">Paid via {a.paymentMethod === "gcash" ? "GCash" : "Cash"}</p>;
+    return <p className="text-xs text-emerald-400">Paid — Cash</p>;
   }
-
-  // Payment can only be collected after treatment is done
   if (a.status !== "completed") {
     return <p className="text-xs text-gold-100/35 italic">Payment available after treatment is completed.</p>;
   }
-
-  // GCash receipt uploaded by patient — staff reviews and confirms
-  if (a.paymentStatus === "pending_verification") {
-    return (
-      <div className="space-y-2">
-        <p className="text-xs text-blue-300 font-medium">GCash receipt submitted — review and confirm</p>
-        {a.paymentScreenshotUrl && (
-          <div>
-            <button
-              type="button"
-              onClick={() => setImgOpen(true)}
-              className="text-xs text-gold-400 underline hover:text-gold-200 transition"
-            >
-              View receipt
-            </button>
-            {imgOpen && (
-              <div
-                className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
-                onClick={() => setImgOpen(false)}
-              >
-                <img
-                  src={a.paymentScreenshotUrl}
-                  alt="GCash receipt"
-                  className="max-w-[90vw] max-h-[85vh] rounded-xl border border-gold-500/30 shadow-2xl"
-                  onClick={(e) => e.stopPropagation()}
-                />
-              </div>
-            )}
-          </div>
-        )}
-        <div className="flex gap-2 flex-wrap">
-          <Button size="sm" onClick={() => onUpdate(a.id, { paymentMethod: "gcash", paymentStatus: "paid" })}>
-            Mark Paid (GCash)
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => onUpdate(a.id, { paymentStatus: "unpaid" })}>
-            Reject
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  if (a.paymentStatus === "partial_paid") {
-    return (
-      <div className="space-y-1.5">
-        <p className="text-xs text-yellow-400">
-          Deposit: ₱{(a.depositAmount ?? 0).toLocaleString()} · Balance: ₱{(a.price - (a.depositAmount ?? 0)).toLocaleString()}
-        </p>
-        <div className="flex gap-2 flex-wrap">
-          <Button size="sm" onClick={() => onUpdate(a.id, { paymentMethod: "cash", paymentStatus: "paid" })}>Cash — Paid</Button>
-          <Button size="sm" variant="subtle" onClick={() => onUpdate(a.id, { paymentMethod: "gcash", paymentStatus: "paid" })}>GCash — Paid</Button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-1.5">
-      <p className="text-xs text-gold-100/55">Confirm payment received:</p>
-      <div className="flex gap-2 flex-wrap">
-        <Button size="sm" onClick={() => onUpdate(a.id, { paymentMethod: "cash", paymentStatus: "paid" })}>
-          Cash — Mark Paid
-        </Button>
-        <Button size="sm" variant="subtle" onClick={() => onUpdate(a.id, { paymentMethod: "gcash", paymentStatus: "paid" })}>
-          GCash — Mark Paid
-        </Button>
-      </div>
-      <DepositForm appointmentId={a.id} price={a.price} actor={actor} onDone={() => {}} />
+      <p className="text-xs text-gold-100/55">Confirm cash payment received:</p>
+      <Button size="sm" onClick={() => onUpdate(a.id, { paymentMethod: "cash", paymentStatus: "paid" })}>
+        Mark as Paid
+      </Button>
     </div>
   );
 }

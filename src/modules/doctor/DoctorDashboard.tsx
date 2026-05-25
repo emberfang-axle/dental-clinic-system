@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { Card } from "../../components/ui";
-import { StatGrid, TodaySchedule, AlertBanner, WeeklyMiniCalendar, RevenueSparkline, LatestAnnouncement, QuickActions } from "../../components/ui/DashboardWidgets";
+import { StatGrid, TodaySchedule, AlertBanner, WeeklyMiniCalendar, RevenueSparkline, LatestAnnouncement, QuickActions, TodaySummaryWidget } from "../../components/ui/DashboardWidgets";
 import { DashboardLayout } from "../../components/layout/DashboardLayout";
 import { useStore } from "../../store/store";
 import { DASHBOARD_TABS } from "../../shared/constants";
@@ -90,6 +90,7 @@ function DoctorOverview({ onTabChange }: { onTabChange: (t: string) => void }) {
         </div>
 
         <div className="space-y-4">
+          <TodaySummaryWidget appointments={appointments} onTabChange={onTabChange} />
           <LatestAnnouncement onViewAll={() => onTabChange("announcements")} />
           <QuickActions actions={[
             { label: "Clinical Records", onClick: () => onTabChange("clinical") },
