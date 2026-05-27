@@ -1,0 +1,19 @@
+DASHBOARD
+-Remove this in the dashboard "Secure Payments."
+"Pay with GCash or cash, with verified transaction tracking."
+PATIENT 
+-Can't type in patient feedback
+-Booking services can't choose more than 2 or all services
+-About surgical/emergency, it can only be displayed in the services and can't click it's because the patient needs to apply a consultation. 
+STAFF
+-Patient form for Walk-in 
+- In the daily queue, the Pending, Confirmed, In progress and Completed is very long. 
+ADMIN DASHBOARD
+- Need a Co-Doctor Accounts
+-Without a button to generate report
+General 
+-Need a CRUD
+-Notification without limitation
+-A Gmail address without @gmail.com is not valid
+-Can add profile picture user and admin
+

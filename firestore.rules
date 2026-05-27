@@ -1,0 +1,141 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function authed() { return request.auth != null; }
+    function uid()    { return request.auth.uid; }
+
+    function role() {
+      return exists(/databases/$(database)/documents/users/$(uid()))
+        ? get(/databases/$(database)/documents/users/$(uid())).data.get('role', 'patient')
+        : 'patient';
+    }
+
+    function isAdminOrDoctor() { return role() in ['admin', 'doctor', 'co-doctor']; }
+    function isStaffOrAbove()  { return role() in ['admin', 'doctor', 'co-doctor', 'staff']; }
+
+    // ── USERS ──────────────────────────────────────────────
+    match /users/{userId} {
+      allow read: if authed();
+
+      allow create: if authed()
+        && uid() == userId
+        && request.resource.data.role in ['patient', 'staff', 'doctor', 'co-doctor'];
+
+      allow update: if authed()
+        && uid() == userId
+        && request.resource.data.role == resource.data.role;
+
+      allow create, update: if authed() && isAdminOrDoctor();
+
+      // Owner / admin cleanup (setup stale profiles, orphaned docs) — not co-doctor
+      allow delete: if authed() && role() in ['admin', 'doctor'];
+    }
+
+    // ── APPOINTMENTS ───────────────────────────────────────
+    match /appointments/{appointmentId} {
+      allow read: if authed() && (
+        resource.data.patientId == uid() || isStaffOrAbove()
+      );
+
+      allow create: if authed() && (
+        isStaffOrAbove() ||
+        (
+          request.resource.data.status == 'pending' &&
+          request.resource.data.paymentStatus == 'unpaid' &&
+          request.resource.data.patientId == uid() &&
+          request.resource.data.paymentMethod == 'cash'
+        )
+      );
+
+      allow update: if authed() && (
+        (
+          isStaffOrAbove() &&
+          (
+            !request.resource.data.diff(resource.data).affectedKeys().hasAny(['paymentMethod']) ||
+            request.resource.data.paymentMethod in ['cash', 'gcash']
+          )
+        ) ||
+        (
+          resource.data.patientId == uid() &&
+          request.resource.data.patientId == resource.data.patientId &&
+          request.resource.data.price == resource.data.price &&
+          request.resource.data.serviceId == resource.data.serviceId &&
+          request.resource.data.doctor == resource.data.doctor &&
+          request.resource.data.paymentStatus == resource.data.paymentStatus &&
+          request.resource.data.paymentMethod == resource.data.paymentMethod &&
+          (
+            request.resource.data.status == resource.data.status ||
+            (request.resource.data.status == 'cancelled' && resource.data.status in ['pending', 'confirmed', 'rescheduled']) ||
+            (request.resource.data.status == 'rescheduled' && resource.data.status in ['pending', 'confirmed'])
+          )
+        )
+      );
+
+      allow delete: if authed() && isAdminOrDoctor();
+    }
+
+    // ── SERVICES (public read) ─────────────────────────────
+    match /services/{serviceId} {
+      allow read: if true;
+      allow write: if authed() && isAdminOrDoctor();
+    }
+
+    // ── SETTINGS ──────────────────────────────────────────
+    match /settings/{docId} {
+      allow read: if authed();
+      allow write: if authed() && isAdminOrDoctor();
+    }
+
+    // ── NOTIFICATIONS ─────────────────────────────────────
+    match /notifications/{notifId} {
+      allow create: if authed();
+      allow read, update, delete: if authed() && (
+        resource.data.userId == uid() || isAdminOrDoctor()
+      );
+    }
+
+    // ── ANNOUNCEMENTS ─────────────────────────────────────
+    match /announcements/{id} {
+      allow read: if true;
+      allow write: if authed() && isAdminOrDoctor();
+    }
+
+    // ── FEEDBACK ──────────────────────────────────────────
+    match /feedbacks/{feedbackId} {
+      allow read: if resource.data.showOnLanding == true
+        || (authed() && (isStaffOrAbove() || resource.data.userId == uid()));
+      allow create: if authed() && request.resource.data.userId == uid();
+      allow update, delete: if authed() && (
+        resource.data.userId == uid() || isAdminOrDoctor()
+      );
+    }
+
+    // ── AUDIT LOGS ────────────────────────────────────────
+    match /logs/{logId} {
+      allow read: if authed() && isAdminOrDoctor();
+      allow create: if authed();
+      allow update, delete: if false;
+    }
+
+    // ── WAITLIST ──────────────────────────────────────────
+    match /waitlist/{entryId} {
+      allow read: if true;
+      allow create: if authed() && request.resource.data.patientId == uid();
+      allow delete: if authed() && (resource.data.patientId == uid() || isStaffOrAbove());
+      allow update: if authed() && isStaffOrAbove();
+    }
+
+    // ── DOCTOR SCHEDULES ──────────────────────────────────
+    match /doctorSchedules/{docId} {
+      allow read: if true;
+      allow write: if authed() && isAdminOrDoctor();
+    }
+
+    // ── BLOCKED SLOTS ─────────────────────────────────────
+    match /blockedSlots/{slotId} {
+      allow read: if true;
+      allow write: if authed() && isAdminOrDoctor();
+    }
+  }
+}
