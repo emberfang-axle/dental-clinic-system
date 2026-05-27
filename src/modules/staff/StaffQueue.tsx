@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Badge, Button, Card } from "../../components/ui";
 import { appointmentsService } from "../../services/appointments";
 import { useStore } from "../../store/store";
 import type { Appointment, AppointmentStatus } from "../../shared/types";
 import { DepositForm } from "./DepositForm";
+
+const PAGE_SIZE = 15;
 
 const COLUMNS: { key: AppointmentStatus; label: string; short: string }[] = [
   { key: "pending",     label: "Pending",     short: "Pending" },
@@ -15,15 +17,27 @@ const COLUMNS: { key: AppointmentStatus; label: string; short: string }[] = [
 export function StaffQueue() {
   const { appointments, user } = useStore();
   const today = new Date().toISOString().slice(0, 10);
-  const [error, setError]     = useState<string | null>(null);
+  const [error, setError]       = useState<string | null>(null);
   const [deduping, setDeduping] = useState(false);
   const [dedupMsg, setDedupMsg] = useState<string | null>(null);
+  const [page, setPage]         = useState(1);
+  const prevQueueLen            = useRef(0);
 
   // FIFO: oldest createdAt first (first booked = first served)
   const queue = appointments
     .filter((a) => a.status !== "cancelled")
     .sort((a, b) => (a.createdAt ?? a.date + a.time).localeCompare(b.createdAt ?? b.date + b.time));
 
+  const totalPages = Math.max(1, Math.ceil(queue.length / PAGE_SIZE));
+  const safePage   = Math.min(page, totalPages);
+
+  // Auto-jump to last page when a new booking is added (newest = last in FIFO)
+  useEffect(() => {
+    if (queue.length > prevQueueLen.current) setPage(totalPages);
+    prevQueueLen.current = queue.length;
+  }, [queue.length, totalPages]);
+
+  const paged      = queue.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
   const todayQueue = queue.filter((a) => a.date === today);
 
   async function tryUpdate(id: string, data: Partial<Appointment>) {
@@ -100,10 +114,10 @@ export function StaffQueue() {
               </tr>
             </thead>
             <tbody>
-              {queue.length === 0 && (
+              {paged.length === 0 && (
                 <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-gold-100/40">No appointments in queue.</td></tr>
               )}
-              {queue.map((a) => (
+              {paged.map((a) => (
                 <tr key={a.id} className="border-b border-gold-500/10 hover:bg-gold-500/5 transition">
                   <td className="px-4 py-3">
                     <div className="font-medium text-gold-100">{a.patientName}</div>
@@ -133,6 +147,15 @@ export function StaffQueue() {
           </table>
         </div>
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 pt-2" role="navigation" aria-label="Queue pagination">
+          <Button size="sm" variant="ghost" disabled={safePage === 1} onClick={() => setPage(safePage - 1)}>← Prev</Button>
+          <span className="text-xs text-gold-100/50">{safePage} / {totalPages}</span>
+          <Button size="sm" variant="ghost" disabled={safePage === totalPages} onClick={() => setPage(safePage + 1)}>Next →</Button>
+        </div>
+      )}
     </div>
   );
 }
