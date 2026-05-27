@@ -30,9 +30,6 @@ export default function App() {
     window.scrollTo({ top: 0 });
   }
 
-  // Wait for Firebase to restore session before routing
-  if (!authReady) return null;
-
   const role = user?.role;
   const isDashboard = path.startsWith(ROUTES.dashboard);
 
@@ -43,6 +40,8 @@ export default function App() {
   else if (isDashboard && !canAccessRoute(path, role)) redirect = dashboardPathFor(role!);
 
   useEffect(() => { if (redirect) navigate(redirect); }, [redirect]);
+
+  if (!authReady) return null;
   if (redirect) return null;
 
   const PAGES: Record<string, JSX.Element> = {
